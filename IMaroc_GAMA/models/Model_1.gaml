@@ -22,10 +22,12 @@ global {
 	
 	int max_weight;
 	int weight_threshold<-10;
+	int max_pop_per_district_2008;
+	int max_pop_per_district_2023;
 	
 	init {
 		//creation of the building agents from the shapefile: the height and type attributes of the building agents are initialized according to the HEIGHT and NATURE attributes of the shapefile
-		create zone from: zonage_pdu0_shape_file with:[id::int(get("id")),pop::int(get("pop2008")), type::string(get("NATURE"))];
+		create zone from: zonage_pdu0_shape_file with:[id::int(get("id")),pop_2008::int(get("pop2008")),pop::int(get("pop2023")), type::string(get("NATURE"))];
 		create road from: kech_roads0_shape_file;
 		//convert the file into a matrix
 		matrix data <- matrix(ODMatrix0_csv_file);
@@ -39,6 +41,8 @@ global {
 			}	
 		}	
 		max_weight <- max(link collect each.weight );
+		max_pop_per_district_2008<-max(zone collect each.pop_2008);
+		max_pop_per_district_2023<-max(zone collect each.pop);
 	}
 }
 
@@ -55,20 +59,25 @@ species link{
 
 species zone {
 	int id;
+	int pop_2008;
 	int pop;
 	string type;
 	rgb color;
 	
 	aspect pop {
-		draw shape depth:pop/100 color: blend(#gamared,#white,pop/140000) border:blend(#gamared,#white,pop/140000) width:3;
+		draw shape depth:pop/100 color: blend(#gamared,#white,pop/max_pop_per_district_2023) border:blend(#gamared,#white,pop/max_pop_per_district_2023) width:3;
 		draw string(pop) at:{location.x,location.y,(pop/100)*1.1} color: #black font: font("Helvetica", 10 );
-	}	
+	}
+	aspect pop_2008 {
+		draw shape depth:pop_2008/100 color: blend(#gamared,#white,pop_2008/max_pop_per_district_2008) border:blend(#gamared,#white,pop_2008/max_pop_per_district_2008) width:3;
+		draw string(pop_2008) at:{location.x,location.y,(pop_2008/100)*1.1} color: #black font: font("Helvetica", 10 );
+	}		
 	aspect od {
 		draw shape color: blend(#gamared,#white,pop/140000) border:blend(#gamared,#white,pop/140000) width:3;
 		ask (link where (each.origin.id=id)){
 			if(weight>weight_threshold){
 			  //draw curve(origin.location,destination.location,0.5,20, 0.8,90) end_arrow: 100  width:(weight/max_weight)*100 color:list_of_color[origin.id];
-			  draw curve(origin.location,destination.location,weight/max_weight,20, 0.8,90) end_arrow: 100  width:(weight/max_weight)*50 color:blend(#gamared,#black,weight/max_weight);	
+			  draw curve(origin.location,destination.location,weight/max_weight*2,100, 0.8,90) end_arrow: 100  width:(weight/max_weight)*50 color:blend(#gamared,#black,weight/max_weight);	
 			}
 		}
 	}	
@@ -85,10 +94,21 @@ species road{
 
 experiment IMaroc type: gui {
 	output {
+		
+		display Population_2008 type: 3d axes:true background:rgb(0,50,0){
+			graphics "info"{ 
+				draw "I-MAROC" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
+				draw "Population (2008): "  + sum(zone collect each.pop_2008) at:{0,-1000}  color: #white font: font("Helvetica", 14 , #bold);
+			}
+			species zone aspect:pop_2008 position:{0,0,-0.01} transparency:0.25;
+			species road;
+		}
+		
+		
 		display Population type: 3d axes:true background:rgb(0,50,0){
 			graphics "info"{ 
 				draw "I-MAROC" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
-				draw "Population: "  + sum(zone collect each.pop) at:{0,-1000}  color: #white font: font("Helvetica", 14 , #bold);
+				draw "Population (2023): "  + sum(zone collect each.pop) at:{0,-1000}  color: #white font: font("Helvetica", 14 , #bold);
 			}
 			species zone aspect:pop position:{0,0,-0.01} transparency:0.25;
 			species road;
