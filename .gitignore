@@ -1,4 +1,7 @@
-
+.gitignore
 data/gis/.DS_Store
 data/.DS_Store
 .DS_Store
+.built_in_models_1709041821778
+.gama_application_workspace
+.metadata
