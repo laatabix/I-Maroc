@@ -8,10 +8,10 @@
 model VisualNetwork
 
 global {
-	file marrakesh_pdu <- shape_file("../includes/gis/PDU zoning/zonage_pdu.shp"); 
-	file bus_network <- shape_file("../includes/gis/network/bus_lines_cleaned.shp");
-	file marrakesh_bus_stops <- shape_file("../includes/gis/network/bus_stops.shp");
-	file taxi_network <- shape_file("../includes/gis/network/taxi_lines.shp");
+	file marrakesh_pdu <- shape_file("../includes/gis/PDU_zoning/zonage_pdu.shp"); 
+	file bus_network <- shape_file("../includes/gis/bus_network/bus_lines.shp");
+	file marrakesh_bus_stops <- shape_file("../includes/gis/bus_network/bus_stops.shp");
+	file taxi_network <- shape_file("../includes/gis/taxi_network/taxi_lines.shp");
 	
 	geometry shape <- envelope (bus_network);
 	

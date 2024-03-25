@@ -9,12 +9,12 @@ model simpleShapefileLoading
 
 
 global {	
-	shape_file marrakesh0_shape_file <- shape_file("../includes/data/gis/administrative/marrakesh_districts.shp");
-	shape_file zonage_pdu0_shape_file <- shape_file("../includes/data/gis/PDU zoning/zonage_pdu.shp");
-	shape_file kech_roads0_shape_file <- shape_file("../includes/data/gis/roads/kech_roads.shp");
+	shape_file marrakesh0_shape_file <- shape_file("../includes/gis/administrative/marrakesh_districts.shp");
+	shape_file zonage_pdu0_shape_file <- shape_file("../includes/gis/PDU_zoning/zonage_pdu.shp");
+	shape_file kech_roads0_shape_file <- shape_file("../includes/gis/roads/kech_roads.shp");
 	
 
-	csv_file ODMatrix0_csv_file <- csv_file("../includes/data/mobility/ODMatrix.csv");
+	csv_file ODMatrix0_csv_file <- csv_file("../includes/mobility/Bus_OD_Matrix.csv");
 	list<rgb> list_of_color <- list_with(27,rnd_color(255));
 
 	//definition of the geometry of the world agent (environment) as the envelope of the shapefile

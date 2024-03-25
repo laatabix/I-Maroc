@@ -9,7 +9,7 @@ model MatrixGenerator
 
 global {
 
-	shape_file pdu_shape_file <- shape_file("../includes/gis/PDU zoning/zonage_pdu.shp");
+	shape_file pdu_shape_file <- shape_file("../includes/gis/PDU_zoning/zonage_pdu.shp");
 	shape_file district_shape_file <- shape_file("../includes/gis/administrative/marrakesh_districts.shp");
 	
 	// data in these lists is in the same order
