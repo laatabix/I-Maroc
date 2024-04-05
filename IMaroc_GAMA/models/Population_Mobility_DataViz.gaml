@@ -40,7 +40,6 @@ global {
 		//convert the file into a matrix
 		int curODID<-0;
 		loop o over:ODMatrixS{
-		  curODID<-curODID+1;
 		  matrix data <- matrix(o);
 			loop i from: 1 to: data.rows -1{
 				loop j from: 0 to: data.columns -1{
@@ -52,6 +51,7 @@ global {
 					}
 				}	
 			}	
+		  curODID<-curODID+1;
 		}
 				
 		max_weight <- max(link collect each.weight );
