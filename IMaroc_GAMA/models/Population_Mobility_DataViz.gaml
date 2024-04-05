@@ -219,7 +219,7 @@ experiment IMaroc_Mobility type: gui {
 		}
 		display OD_pedestrian type: 3d axes:true background:background toolbar:false{
 			graphics "info"{ 
-				draw "Pedestrian: "+ sum(link where (each.mode=0) collect each.weight) + " trips" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
+				draw "Pedestrians: "+ sum(link where (each.mode=0) collect each.weight) + " trips" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
 			}
 			species district aspect:base position:{0,0,-0.01};
 			species link aspect:pedestrian;
@@ -233,21 +233,21 @@ experiment IMaroc_Mobility type: gui {
 		} 
 		display OD_moped type: 3d axes:true background:background toolbar:false{
 			graphics "info"{ 
-				draw "Moped: " + sum(link where (each.mode=2) collect each.weight) + " trips" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
+				draw "Mopeds: " + sum(link where (each.mode=2) collect each.weight) + " trips" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
 			}
 			species district aspect:base position:{0,0,-0.01};
 			species link aspect:moped;
 		}
 		display OD_car type: 3d axes:true background:background toolbar:false{
 			graphics "info"{ 
-				draw "Car: "+ sum(link where (each.mode=3) collect each.weight) + " trips"  at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
+				draw "Cars: "+ sum(link where (each.mode=3) collect each.weight) + " trips"  at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
 			}
 			species district aspect:base position:{0,0,-0.01};
 			species link aspect:car;
 		}
 		display OD_public type: 3d axes:true background:background toolbar:false{
 			graphics "info"{ 
-				draw "Public: " + sum(link where (each.mode=4) collect each.weight) + " trips" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
+				draw "Public Transport: " + sum(link where (each.mode=4) collect each.weight) + " trips" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
 			}
 			species district aspect:base position:{0,0,-0.01};
 			species link aspect:public;
