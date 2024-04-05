@@ -94,10 +94,14 @@ species travelers{
 	float nb_travelers -> S+E+I+R;
 	
 	aspect default{
-		if (nb_travelers > weight_threshold*trip_scale){
+		if (E+I>50){
 			rgb lineColor <- blend(#gamared,#white,10*(E+I)/(S+E+I+R));
-			draw curve(origin.location,destination.location,0.5,20, 0.8,90) end_arrow: 100  width:(nb_travelers/max_weight)*10 color:lineColor;		
+			draw curve(origin.location,destination.location,0.5,20, 0.8,90) end_arrow: 100  width:(nb_travelers/max_weight)*5 color:lineColor;		
 		}
+//		if (nb_travelers > weight_threshold*trip_scale){
+//			rgb lineColor <- blend(#gamared,#white,10*(E+I)/(S+E+I+R));
+//			draw curve(origin.location,destination.location,0.5,20, 0.8,90) end_arrow: 100  width:(nb_travelers/max_weight)*10 color:lineColor;		
+//		}
 	}
 }
 
