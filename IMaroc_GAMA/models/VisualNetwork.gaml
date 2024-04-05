@@ -39,12 +39,12 @@ global {
 		
 		create TaxiStation from: taxi_stations_shp with: [ts_id::int(get("ID")), ts_name::get("NAME")];
 		create dummy_geom from: taxi_lines_shp with:
-					[varstr0::get("ID_TXLINE"),varstr1::get("NAME"),varint1::int(get("DIR")),
+					[varint0::int(get("ID_TXLINE")),varstr1::get("NAME"),varint1::int(get("DIR")),
 						varint2::int(get("ST_START")),varint3::int(get("ST_END"))];
 		
-		loop tx_id over: remove_duplicates(dummy_geom collect (each.varstr0)) {
-			dummy_geom out <- dummy_geom first_with (each.varstr0 = tx_id and each.varint1 = DIRECTION_OUTGOING);
-			dummy_geom ret <- dummy_geom first_with (each.varstr0 = tx_id and each.varint1 = DIRECTION_RETURN);
+		loop tx_id over: remove_duplicates(dummy_geom collect (each.varint0)) {
+			dummy_geom out <- dummy_geom first_with (each.varint0 = tx_id and each.varint1 = DIRECTION_OUTGOING);
+			dummy_geom ret <- dummy_geom first_with (each.varint0 = tx_id and each.varint1 = DIRECTION_RETURN);
 			create TaxiLine {
 				tl_id <- tx_id;
 				tl_name <- out.varstr1;
@@ -52,13 +52,20 @@ global {
 				tl_end_ts <- TaxiStation first_with (each.ts_id = out.varint3);
 				tl_outgoing_geom <- out.shape;
 				tl_return_geom <- ret.shape;
-				//shape <- tl_outgoing_geom + tl_return_geom;
+				shape <- tl_outgoing_geom + tl_return_geom;
 			}
 		}
 		
+		
+		
+		
+		graph road_network <- as_edge_graph(list(TaxiLine));
+		
+		
+		
 		ask dummy_geom { do die; } // DEL temporary agents
 				
-		ask TaxiLine where !(each.tl_id in ["TX4"]){ do die;}
+		ask TaxiLine where !(each.tl_id in [4]){ do die;}
 		
 		ask TaxiLine {
 			write "---------------- " + self.tl_name;
@@ -97,7 +104,7 @@ global {
 		/******* BUS *******/
 		/******************/
 		
-		//create dummy_geom from: bus_network with: [g_name::get("NAME"),g_direction::int(get("DIR"))];
+		/*create dummy_geom from: bus_lines_shp with: [varstr0::get("NAME"),varint0::int(get("DIR"))];
 		/*create BusStop from: marrakesh_bus_stops with: [bs_id::int(get("stop_numbe")), bs_name::get("stop_name")]{
 			bs_zone <- first(PDUZone overlapping self);
 		}
@@ -111,18 +118,18 @@ global {
 			if current_bl = nil {
 				create BusLine returns: my_busline {
 					bl_name <- bus_line_name;
-					bl_outgoing_geom <- dummy_geom first_with (each.g_name = bl_name and each.g_direction = BL_DIRECTION_OUTGOING);
-					bl_return_geom <- dummy_geom first_with (each.g_name = bl_name and each.g_direction = BL_DIRECTION_RETURN);
+					bl_outgoing_geom <- dummy_geom first_with (each.varstr0 = bl_name and each.varint0 = DIRECTION_OUTGOING);
+					bl_return_geom <- dummy_geom first_with (each.varstr0 = bl_name and each.varint0 = DIRECTION_RETURN);
 					shape <- bl_outgoing_geom;// + bl_return_geom;
-					bl_points <- shape.points;
-					bl_segments <- world.points_to_segments (bl_points);
+					//bl_points <- shape.points;
+					//bl_segments <- world.points_to_segments (bl_points);
 				}
 				current_bl <- my_busline[0];
 			}
 
 			BusStop current_bs <- BusStop first_with (each.bs_id = int(dataMatrix[3,i]));
 			if current_bs != nil {
-				if int(dataMatrix[1,i]) = BL_DIRECTION_OUTGOING {
+				if int(dataMatrix[1,i]) = DIRECTION_OUTGOING {
 					if length(current_bl.bl_outgoing_bs) != int(dataMatrix[2,i]) {
 						write "Error in order of bus stops!" color: #red;
 					}
@@ -143,7 +150,7 @@ global {
 			do die;
 		}
 				
-		ask BusLine where !(each.bl_name in ["L12","L1"]) {
+		/*ask BusLine where !(each.bl_name in ["L12","L1"]) {
 			do die;
 		}*/
 	}
@@ -381,7 +388,7 @@ species BusStop schedules: [] {
 }
 
 species TaxiLine schedules: [] {
-	string tl_id;
+	int tl_id;
 	string tl_name;
 	TaxiStation tl_start_ts;
 	TaxiStation tl_end_ts;	
