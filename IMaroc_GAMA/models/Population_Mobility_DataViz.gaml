@@ -14,8 +14,12 @@ global {
 	shape_file kech_roads0_shape_file <- shape_file("../includes/gis/roads/kech_roads.shp");
 	
 
-	csv_file ODMatrix0_csv_file <- csv_file("../includes/mobility/Bus_OD_Matrix.csv");
+	
+	list<csv_file> ODMatrixS <- [csv_file("../includes/mobility/Pedestrian_OD_Matrix.csv"), csv_file("../includes/mobility/Bus_OD_Matrix.csv"),csv_file("../includes/mobility/Moped_OD_Matrix.csv"),csv_file("../includes/mobility/Car_OD_Matrix.csv"),csv_file("../includes/mobility/PublicTrans_OD_Matrix.csv")];
+	map<int,rgb> color_per_mode <- [0::rgb(52,152,219), 1::rgb(192,57,43), 2::rgb(161,196,90), 3::#magenta,4::#cyan];
+	
 	list<rgb> list_of_color <- list_with(27,rnd_color(255));
+	rgb background<-#black;
 
 	//definition of the geometry of the world agent (environment) as the envelope of the shapefile
 	geometry shape <- envelope(marrakesh0_shape_file);
@@ -34,16 +38,22 @@ global {
 		create district from: zonage_pdu0_shape_file with:[id::int(get("id")),pop_2008::int(get("pop2008")),pop::int(get("pop2023")), type::string(get("NATURE"))];
 		create road from: kech_roads0_shape_file;
 		//convert the file into a matrix
-		matrix data <- matrix(ODMatrix0_csv_file);
-		loop i from: 1 to: data.rows -1{
-			loop j from: 0 to: data.columns -1{
-				create link{	
-					origin <- first(district where (each.id=i));
-					destination <- first(district where (each.id=j));
-					weight <- int(data[j,i]);
-				}
+		int curODID<-0;
+		loop o over:ODMatrixS{
+		  curODID<-curODID+1;
+		  matrix data <- matrix(o);
+			loop i from: 1 to: data.rows -1{
+				loop j from: 0 to: data.columns -1{
+					create link{	
+						origin <- first(district where (each.id=i));
+						destination <- first(district where (each.id=j));
+						weight <- int(data[j,i]);
+						mode<-curODID;
+					}
+				}	
 			}	
-		}	
+		}
+				
 		max_weight <- max(link collect each.weight );
 		max_pop_per_district_2008<-max(district collect each.pop_2008);
 		max_pop_per_district_2023<-max(district collect each.pop);
@@ -57,10 +67,35 @@ species link{
 	district origin;
 	district destination;
 	int weight;
+	int mode;
 	
 	aspect default{
-		//draw line(origin.location,destination.location) end_arrow: 10  width:2 color:list_of_color[origin.id];
-		draw curve(origin.location,destination.location,0.5,20, 0.8,90) end_arrow: 100  width:(weight/max_weight)*100 color:list_of_color[origin.id];
+		draw curve(origin.location,destination.location,0.5,20, 0.8,90) end_arrow: 100  width:(weight/max_weight)*100 color:color_per_mode[mode];
+	}
+	aspect pedestrian{
+		if(mode=0){
+			draw curve(origin.location,destination.location,0.5,20, 0.8,90) end_arrow: 100  width:(weight/max_weight)*100 color:color_per_mode[mode];
+		}
+	}
+	aspect bus{
+		if(mode=1){
+			draw curve(origin.location,destination.location,0.5,20, 0.8,90) end_arrow: 100  width:(weight/max_weight)*100 color:color_per_mode[mode];
+		}
+	}
+	aspect moped{
+		if(mode=2){
+			draw curve(origin.location,destination.location,0.5,20, 0.8,90) end_arrow: 100  width:(weight/max_weight)*100 color:color_per_mode[mode];
+		}
+	}
+	aspect car{
+		if(mode=3){
+			draw curve(origin.location,destination.location,0.5,20, 0.8,90) end_arrow: 100  width:(weight/max_weight)*100 color:color_per_mode[mode];
+		}
+	}
+	aspect public{
+		if(mode=4){
+			draw curve(origin.location,destination.location,0.5,20, 0.8,90) end_arrow: 100  width:(weight/max_weight)*100 color:color_per_mode[mode];
+		}
 	}
 }
 
@@ -70,6 +105,10 @@ species district {
 	int pop;
 	string type;
 	rgb color;
+	
+	aspect base{
+		draw shape color:#white border:#black;
+	}
 	
 	aspect pop {
 		draw shape depth:pop/100 color: blend(#gamared,#white,pop/max_pop_per_district_2023) border:blend(#gamared,#white,pop/max_pop_per_district_2023) width:3;
@@ -119,7 +158,7 @@ species zone{
 }
 
 
-experiment IMaroc type: gui {
+experiment IMaroc_population type: gui {
 	output {
 		
 		display Population_2014 type: 3d axes:true background:rgb(0,50,0){
@@ -173,6 +212,54 @@ experiment IMaroc type: gui {
 			species district aspect:od position:{0,0,-0.01};
 			species road;
 			//species link;
+		}
+	}
+}
+
+experiment IMaroc_Mobility type: gui {
+	output {
+		display OD type: 3d axes:true background:background toolbar:false{
+			graphics "info"{ 
+				draw "I-MAROC" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
+				draw "Origin Destination: "  + sum(link collect each.weight) + " trips" at:{0,-1000}  color: #white font: font("Helvetica", 14 , #bold);
+			}
+			species district aspect:base position:{0,0,-0.01};
+			species link;
+		}
+		display OD_pedestrian type: 3d axes:true background:background toolbar:false{
+			graphics "info"{ 
+				draw "Pedestrian: "+ sum(link where (each.mode=0) collect each.weight) + " trips" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
+			}
+			species district aspect:base position:{0,0,-0.01};
+			species link aspect:pedestrian;
+		}
+		display OD_bus type: 3d axes:true background:background toolbar:false{
+			graphics "info"{ 
+				draw "Bus: "+ sum(link where (each.mode=1) collect each.weight) + " trips"  at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
+			}
+			species district aspect:base position:{0,0,-0.01};
+			species link aspect:bus;
+		} 
+		display OD_moped type: 3d axes:true background:background toolbar:false{
+			graphics "info"{ 
+				draw "Moped: " + sum(link where (each.mode=2) collect each.weight) + " trips" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
+			}
+			species district aspect:base position:{0,0,-0.01};
+			species link aspect:moped;
+		}
+		display OD_car type: 3d axes:true background:background toolbar:false{
+			graphics "info"{ 
+				draw "Car: "+ sum(link where (each.mode=3) collect each.weight) + " trips"  at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
+			}
+			species district aspect:base position:{0,0,-0.01};
+			species link aspect:car;
+		}
+		display OD_public type: 3d axes:true background:background toolbar:false{
+			graphics "info"{ 
+				draw "Public: " + sum(link where (each.mode=4) collect each.weight) + " trips" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
+			}
+			species district aspect:base position:{0,0,-0.01};
+			species link aspect:public;
 		}
 	}
 }
