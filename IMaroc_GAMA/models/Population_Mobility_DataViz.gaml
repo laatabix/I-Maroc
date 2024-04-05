@@ -204,15 +204,6 @@ experiment IMaroc_population type: gui {
 			species district aspect:pop position:{0,0,-0.01} transparency:0.25;
 			species road;
 		}
-		display OD type: 3d axes:true background:#gamablue{
-			graphics "info"{ 
-				draw "I-MAROC" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
-				draw "Origin Destination: "  + sum(link collect each.weight) + " trips" at:{0,-1000}  color: #white font: font("Helvetica", 14 , #bold);
-			}
-			species district aspect:od position:{0,0,-0.01};
-			species road;
-			//species link;
-		}
 	}
 }
 
