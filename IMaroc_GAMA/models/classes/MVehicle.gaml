@@ -17,7 +17,7 @@ global {
 	// speed of busses in the suburban area
 	float SUBURBAN_SPEED <- 60#km/#hour;
 	// the minimum wait time at bus stops
-	float MIN_WAIT_TIME_BS <- 180#second;
+	float MIN_WAIT_TIME_STOP <- 120#second;
 	
 }
 
@@ -28,13 +28,25 @@ global {
 species MVehicle skills: [moving] {
 	MLine v_line;
 	int v_current_direction;
-	MStop v_current_bs;
-	MStop v_next_bs;
+	MStop v_current_stop;
+	MStop v_next_stop;
 	point v_next_loc;
 	float v_stop_wait_time <- -1.0;
 	bool v_in_city <- true;
-	image_file v_icon <- image_file("../../includes/img/bus.png");
-	geometry shape <- envelope(v_icon);
+	
+	action init_vehicle (MLine mline, int direc) {
+		v_line <- mline;
+		v_current_direction <- direc;	
+		if v_current_direction = DIRECTION_OUTGOING {
+			v_current_stop <- v_line.line_outgoing_stops.keys[0];
+			location <- v_line.line_outgoing_stops.values[0];
+		} else {
+			v_current_stop <- v_line.line_return_stops.keys[0];
+			location <- v_line.line_return_stops.values[0];
+		}
+		v_next_stop <- v_current_stop;
+		v_next_loc <- location;
+	}
 	
 	reflex drive {
 		// if the bus has to wait
@@ -48,27 +60,27 @@ species MVehicle skills: [moving] {
 		}
 		// the bus has reached its next bus stop
 		if location overlaps (10#meter around v_next_loc) {
-			v_stop_wait_time <- MIN_WAIT_TIME_BS;
-			v_current_bs <- v_next_bs;
+			v_stop_wait_time <- MIN_WAIT_TIME_STOP;
+			v_current_stop <- v_next_stop;
 				
 			// to know the next stop
 			if v_current_direction = DIRECTION_OUTGOING { // outgoing
-				if v_current_bs = last(v_line.line_outgoing_stops.keys) { // last outgoing stop
+				if v_current_stop = last(v_line.line_outgoing_stops.keys) { // last outgoing stop
 					v_current_direction <- DIRECTION_RETURN;
-					v_next_bs <- v_line.line_return_stops.keys[0];
-					v_next_loc <- v_line.line_return_stops at v_next_bs;
+					v_next_stop <- v_line.line_return_stops.keys[0];
+					v_next_loc <- v_line.line_return_stops at v_next_stop;
 				} else {
-					v_next_bs <- v_line.line_outgoing_stops.keys[(v_line.line_outgoing_stops.keys index_of v_next_bs) + 1];
-					v_next_loc <- v_line.line_outgoing_stops at v_next_bs;
+					v_next_stop <- v_line.line_outgoing_stops.keys[(v_line.line_outgoing_stops.keys index_of v_next_stop) + 1];
+					v_next_loc <- v_line.line_outgoing_stops at v_next_stop;
 				}
 			} else { // return
-				if v_current_bs = last(v_line.line_return_stops.keys) { // last return stop
+				if v_current_stop = last(v_line.line_return_stops.keys) { // last return stop
 					v_current_direction <- DIRECTION_OUTGOING;
-					v_next_bs <- v_line.line_outgoing_stops.keys[0];
-					v_next_loc <- v_line.line_outgoing_stops at v_next_bs;
+					v_next_stop <- v_line.line_outgoing_stops.keys[0];
+					v_next_loc <- v_line.line_outgoing_stops at v_next_stop;
 				} else {
-					v_next_bs <- v_line.line_return_stops.keys[(v_line.line_return_stops.keys index_of v_next_bs) + 1];
-					v_next_loc <- v_line.line_return_stops at v_next_bs;
+					v_next_stop <- v_line.line_return_stops.keys[(v_line.line_return_stops.keys index_of v_next_stop) + 1];
+					v_next_loc <- v_line.line_return_stops at v_next_stop;
 				}
 			}
 			return;
@@ -77,33 +89,32 @@ species MVehicle skills: [moving] {
 		speed <- !empty(PDUZone overlapping self) ? v_line.line_com_speed : SUBURBAN_SPEED;
 		
 		if v_current_direction = DIRECTION_OUTGOING {
-			//do follow path: v_line.bl_outgoing_path;
-			do goto target:v_next_loc on: v_line.line_outgoing_path;
+			do goto target: v_next_loc on: v_line.line_outgoing_graph; 
 		}
-		if v_current_direction = DIRECTION_RETURN {
-			//do follow path: v_line.bl_return_path;
-			do goto target:v_next_loc on: v_line.line_return_path;
+		else {
+			do goto target: v_next_loc on: v_line.line_return_graph; 
 		}
 	}
-	
-	//
 }
 
 species BusVehicle parent: MVehicle {
+	image_file v_icon <- image_file("../../includes/img/bus.png");
 	aspect default {
-		draw v_icon size: {50#meter,25#meter} rotate: heading;
+		draw v_icon size: {100#meter,50#meter} rotate: heading;
 	}
 }
 
-species BRTVehicle parent: MVehicle {	
+species BRTVehicle parent: MVehicle {
+	image_file brt_icon <- image_file("../../includes/img/BRT.png");
 	aspect default {
-		draw rectangle(50#meter,25#meter) color: #cyan rotate: heading;
+		draw brt_icon size: {100#meter,50#meter} rotate: heading;
 	}
 }	
 
 species TaxiVehicle parent: MVehicle {
+	image_file taxi_icon <- image_file("../../includes/img/taxi.png");
 	aspect default {
-		draw rectangle(40#meter,20#meter) color: #green rotate: heading;
+		draw shape size: {80#meter,40#meter} rotate: heading;
 	}
 }
 

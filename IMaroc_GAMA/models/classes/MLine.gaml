@@ -16,8 +16,8 @@ global {
 	int DIRECTION_OUTGOING <- 1;
 	int DIRECTION_RETURN <- 2;
 	// colors to color bus lines when displayed
-	list<rgb> BL_COLORS <- [#darkblue,#darkcyan,#darkgoldenrod,#darkgray,#darkkhaki,#darkmagenta,#darkolivegreen,#darkorchid,
-								#darksalmon,#darkseagreen,#darkslateblue,#darkslategray,#darkturquoise,#darkviolet];
+	//list<rgb> BL_COLORS <- [#darkblue,#darkcyan,#darkgoldenrod,#darkgray,#darkkhaki,#darkmagenta,#darkolivegreen,#darkorchid,
+	//							#darksalmon,#darkseagreen,#darkslateblue,#darkslategray,#darkturquoise,#darkviolet];
 
 	//font LFONT0 <- font("Arial", 5, #bold);
 }
@@ -35,29 +35,38 @@ species MLine schedules: [] parallel: true {
 	//rgb bl_color <- one_of(BL_COLORS);
 	geometry line_outgoing_shape;	
 	geometry line_return_shape;
-	path line_outgoing_path;	
-	path line_return_path;	
-
+	graph line_outgoing_graph;	
+	graph line_return_graph;
+	
+	
+	action init_line (string nm, geometry out, geometry ret) {
+		line_name <- nm;
+		line_outgoing_shape <- out;
+		line_return_shape <- ret;
+		line_outgoing_graph <- as_edge_graph(to_segments(line_outgoing_shape));
+		line_return_graph <- as_edge_graph(to_segments(line_return_shape));
+		shape <- line_outgoing_shape + line_return_shape;
+	}
 }
 
 species BusLine parent: MLine {
 	aspect default {
-		draw (shape+10#meter) color: #gamablue;
-		draw (shape+5#meter) color: #white;
+		draw (shape+6#meter) color: #gamablue;
+		draw (shape+3#meter) color: #white;
 	}	
 }
 
 species BRTLine parent: MLine {
 	aspect default {
-		draw (shape+10#meter) color: #darkred;
-		draw (shape+5#meter) color: #white;
+		draw (shape+6#meter) color: #darkorange;
+		draw (shape+3#meter) color: #white;
 	}	
 }
 
 species TaxiLine parent: MLine {
 	aspect default {
-		draw (shape+10#meter) color: #yellowgreen;
-		draw (shape+5#meter) color: #white;
+		draw (shape+6#meter) color: #yellowgreen;
+		draw (shape+3#meter) color: #white;
 	}
 }
 
