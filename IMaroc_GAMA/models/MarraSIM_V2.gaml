@@ -43,7 +43,8 @@ global {
 		// create the environment: city, districts, roads, traffic signals
 		write "Creating the city environment ...";
 		create PDUZone from: marrakesh_pdu with: [pduz_code::int(get("id")), pduz_name::get("label")];
-		
+		/******************/
+		/*** BUS LINES ***/
 		/**************************************************************************************************************************/
 		// create busses, bus stops, and connections
 		//*
@@ -62,7 +63,7 @@ global {
 		loop i from: 0 to: dataMatrix.rows -1 {
 			string bus_line_name <- dataMatrix[0,i];
 			
-			if /*!*/(bus_line_name in ["L13"]){// ["L40","L41","L332","L19","BRT1"]) { 
+			if !(bus_line_name in ["L40","L41","L332","L19","BRT1"]) { 
 				// create the bus line if it does not exist yet
 				BusLine current_bl <- first(BusLine where (each.line_name = bus_line_name));
 				
@@ -124,23 +125,24 @@ global {
 			do die;
 		}
 		//*/
-
+		/******************/
+		/*** BRT LINES ***/
 		/**************************************************************************************************************************/
-		/*
-		write "Creating BRT stops and lines  ...";
+		//*
+		write "Creating BRT stops and lines ...";
 		create BRTStop from: marrakesh_brt_stops with: [stop_id::int(get("ID")), stop_name::get("NAME")]{
 			stop_zone <- first(PDUZone overlapping self);
 		}
 
 		create dummy_geom from: marrakesh_brt_lines with: [g_id::int(get("ID")),g_name::get("NAME")];
 		dataMatrix <- matrix(csv_file("../includes/gis/BRT_network/BRT_lines_stations.csv",true));
-		write dataMatrix.rows;
+
 		dummy_geom brtgeom;
 		list<point> brtpoints;
 		loop i from: 0 to: dataMatrix.rows -1 {
 			int idbrt <- int(dataMatrix[0,i]);
 
-			// create the bus line if it does not exist yet
+			// create the BRT line if it does not exist yet
 			BRTLine current_bl <- first(BRTLine where (each.line_id = idbrt));
 			if current_bl = nil {
 				brtgeom <- dummy_geom first_with (each.g_id = idbrt);
@@ -172,7 +174,7 @@ global {
 			}	
 		}
 		
-		// creating n_vehicles for each bus line
+		// creating n_vehicles for each BRT line
 		write "Creating BRT vehicles ...";
 		ask BRTLine {
 			int n_vehicles <- 2;
@@ -189,9 +191,11 @@ global {
 		}
 		ask dummy_geom { do die; }
 		//*/
-		
+		/******************/
+		/*** TAXI LINES ***/
 		/**************************************************************************************************************************/
-		/*
+		//*
+		write "Creating Taxi lines and stations ...";
 		create TaxiStop from: marrakesh_taxi_stations with: [stop_id::int(get("ID")), stop_name::get("NAME")];
 		create dummy_geom from: marrakesh_taxi_lines with:
 					[g_id::int(get("ID_TXLINE")),g_name::get("NAME"),g_direction::int(get("DIR")),
@@ -216,7 +220,6 @@ global {
 			}
 		}
 				
-		// creating n_vehicles for each bus line
 		write "Creating Taxi vehicles ...";
 		ask TaxiLine {
 			int n_vehicles <- 2;
@@ -267,7 +270,7 @@ experiment MarraSIM type: gui {
 	            draw "" + world.formatted_time() at: {20#px, 25#px} font: AFONT0 color: #yellow;
 	        }
 	        
-	       	//species PDUZone refresh: false;
+	       	species PDUZone refresh: false;
 			species BusLine refresh: false;
 			species BRTLine refresh: false;
 			species TaxiLine refresh: false;

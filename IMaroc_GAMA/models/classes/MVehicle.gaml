@@ -98,9 +98,9 @@ species MVehicle skills: [moving] {
 }
 
 species BusVehicle parent: MVehicle {
-	image_file v_icon <- image_file("../../includes/img/bus.png");
+	image_file bus_icon <- image_file("../../includes/img/bus.png");
 	aspect default {
-		draw v_icon size: {100#meter,50#meter} rotate: heading;
+		draw bus_icon size: {100#meter,50#meter} rotate: heading;
 	}
 }
 
@@ -114,7 +114,7 @@ species BRTVehicle parent: MVehicle {
 species TaxiVehicle parent: MVehicle {
 	image_file taxi_icon <- image_file("../../includes/img/taxi.png");
 	aspect default {
-		draw shape size: {80#meter,40#meter} rotate: heading;
+		draw taxi_icon size: {80#meter,40#meter} rotate: heading;
 	}
 }
 
