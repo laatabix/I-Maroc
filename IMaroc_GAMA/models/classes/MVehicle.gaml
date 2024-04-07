@@ -12,12 +12,29 @@ import "MLine.gaml"
 
 global {
 	
+	list<BusVehicle> sub_urban_vehicles <- [];
+
 	// speed of busses in the urban area
-	float URBAN_SPEED <- 30#km/#hour;
+	float BUS_URBAN_SPEED <- 30#km/#hour;
+	// speed of BRTs and Taxis
+	float BRT_SPEED <- 40#km/#hour;
+	float TAXI_SPEED <- 40#km/#hour;
+	
 	// speed of busses in the suburban area
-	float SUBURBAN_SPEED <- 60#km/#hour;
+	float BUS_SUBURBAN_SPEED <- 60#km/#hour;
+	
 	// the minimum wait time at bus stops
 	float MIN_WAIT_TIME_STOP <- 120#second;
+	
+	// update speed of suburban buslines whenever they in/out of the city
+	reflex update_bus_speeds {
+		ask sub_urban_vehicles {
+			v_speed <- BUS_SUBURBAN_SPEED;
+		}
+		ask sub_urban_vehicles overlapping city_area {
+			v_speed <- v_line.line_com_speed;
+		}
+	}
 	
 }
 
@@ -29,6 +46,7 @@ species MVehicle skills: [moving] {
 	MLine v_line;
 	int v_current_direction;
 	MStop v_current_stop;
+	float v_speed;
 	MStop v_next_stop;
 	point v_next_loc;
 	float v_stop_wait_time <- -1.0;
@@ -86,35 +104,51 @@ species MVehicle skills: [moving] {
 			return;
 		}
 
-		speed <- !empty(PDUZone overlapping self) ? v_line.line_com_speed : SUBURBAN_SPEED;
-		
 		if v_current_direction = DIRECTION_OUTGOING {
-			do goto target: v_next_loc on: v_line.line_outgoing_graph; 
+			do goto target: v_next_loc on: v_line.line_outgoing_graph speed: v_speed; 
 		}
 		else {
-			do goto target: v_next_loc on: v_line.line_return_graph; 
+			do goto target: v_next_loc on: v_line.line_return_graph speed: v_speed; 
 		}
 	}
 }
 
 species BusVehicle parent: MVehicle {
-	image_file bus_icon <- image_file("../../includes/img/bus.png");
+	image_file v_icon <- image_file("../../includes/img/bus.png");
+	geometry shape <- envelope(v_icon);
+
+	init {
+		v_speed <- BUS_URBAN_SPEED;
+	}
+	
 	aspect default {
-		draw bus_icon size: {100#meter,50#meter} rotate: heading;
+		draw v_icon size: {120#meter,60#meter} rotate: heading;
 	}
 }
 
 species BRTVehicle parent: MVehicle {
-	image_file brt_icon <- image_file("../../includes/img/BRT.png");
+	image_file v_icon <- image_file("../../includes/img/BRT.png");
+	geometry shape <- envelope(v_icon);
+	
+	init {
+		v_speed <- BRT_SPEED;
+	}
+	
 	aspect default {
-		draw brt_icon size: {100#meter,50#meter} rotate: heading;
+		draw v_icon size: {120#meter,60#meter} rotate: heading;
 	}
 }	
 
 species TaxiVehicle parent: MVehicle {
-	image_file taxi_icon <- image_file("../../includes/img/taxi.png");
+	image_file v_icon <- image_file("../../includes/img/taxi.png");
+	geometry shape <- envelope(v_icon);
+	
+	init {
+		v_speed <- TAXI_SPEED;
+	}
+	
 	aspect default {
-		draw taxi_icon size: {80#meter,40#meter} rotate: heading;
+		draw v_icon size: {100#meter,50#meter} rotate: heading;
 	}
 }
 

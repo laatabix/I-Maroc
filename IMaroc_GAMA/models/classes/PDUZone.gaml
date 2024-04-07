@@ -11,6 +11,9 @@ model PDUZone
 import "MStop.gaml"
 
 global {
+	// city area
+	geometry city_area;
+	
 		// simulation starts at 06:00 morning
 	float SIM_START_HOUR <- 6#hour;
 	
@@ -34,8 +37,7 @@ global {
 	// adds a zero if it is only one digit (8 --> 08)
 	string zero_time (int i) {
 		return (i <= 9 ? "0" : "") + i;
-	}
-	
+	}	
 }
 
 /*******************************/

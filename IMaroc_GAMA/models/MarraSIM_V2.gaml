@@ -43,6 +43,8 @@ global {
 		// create the environment: city, districts, roads, traffic signals
 		write "Creating the city environment ...";
 		create PDUZone from: marrakesh_pdu with: [pduz_code::int(get("id")), pduz_name::get("label")];
+		city_area <- envelope(PDUZone);
+		
 		/******************/
 		/*** BUS LINES ***/
 		/**************************************************************************************************************************/
@@ -237,6 +239,11 @@ global {
 		ask dummy_geom { do die; }
 		
 		/****** */
+		
+		ask BusLine - (BusLine inside city_area) {
+			sub_urban_vehicles <<+ BusVehicle where (each.v_line = self);
+		}
+		
 		write "--+-- END OF INIT --+--" color:#green;		
 	}
 	
@@ -263,7 +270,7 @@ experiment MarraSIM type: gui {
 	
 	output {
 				 
-		display Marrakesh type: opengl background: #whitesmoke {
+		display Marrakesh type: 3d background: #whitesmoke toolbar:false {
 			camera 'default' location: {76609.6582,72520.6097,11625.0305} target: {76609.6582,72520.4068,0.0};
 			
 			overlay position: {10#px,10#px} size: {100#px,40#px} background: #gray{
@@ -272,14 +279,14 @@ experiment MarraSIM type: gui {
 	        
 	       	species PDUZone refresh: false;
 			species BusLine refresh: false;
-			species BRTLine refresh: false;
 			species TaxiLine refresh: false;
+			species BRTLine refresh: false;
 			species BusStop refresh: false;
 			species BRTStop refresh: false;
 			species TaxiStop refresh: false;
 			species BusVehicle;
-			species BRTVehicle;
 			species TaxiVehicle;
+			species BRTVehicle;
 		}
 	}
 }

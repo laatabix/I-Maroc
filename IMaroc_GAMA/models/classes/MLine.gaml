@@ -12,7 +12,7 @@ import "MVehicle.gaml"
 import "MStop.gaml"
 
 global {
-	
+		
 	int DIRECTION_OUTGOING <- 1;
 	int DIRECTION_RETURN <- 2;
 	// colors to color bus lines when displayed
@@ -29,7 +29,7 @@ global {
 species MLine schedules: [] parallel: true {
 	int line_id;
 	string line_name;
-	float line_com_speed <- URBAN_SPEED; // average speed while considering the traffic constraints
+	float line_com_speed <- BUS_URBAN_SPEED;
 	map<MStop,point> line_outgoing_stops <- []; // list of bus stops on an outgoing path
 	map<MStop,point> line_return_stops <- []; // bus stops on the return path
 	//rgb bl_color <- one_of(BL_COLORS);
@@ -51,22 +51,22 @@ species MLine schedules: [] parallel: true {
 
 species BusLine parent: MLine {
 	aspect default {
-		draw (shape+6#meter) color: #gamablue;
-		draw (shape+3#meter) color: #white;
+		draw (shape+10#meter) color: #gamablue;
+		draw (shape+5#meter) color: #white;
 	}	
 }
 
 species BRTLine parent: MLine {
 	aspect default {
-		draw (shape+6#meter) color: #darkorange;
-		draw (shape+3#meter) color: #white;
+		draw (shape+10#meter) color: #darkred;
+		draw (shape+5#meter) color: #white;
 	}	
 }
 
 species TaxiLine parent: MLine {
 	aspect default {
-		draw (shape+6#meter) color: #yellowgreen;
-		draw (shape+3#meter) color: #white;
+		draw (shape+10#meter) color: #darkgreen;
+		draw (shape+5#meter) color: #white;
 	}
 }
 

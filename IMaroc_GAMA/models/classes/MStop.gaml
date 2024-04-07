@@ -27,7 +27,7 @@ species MStop schedules: [] parallel: true {
 
 species BusStop parent: MStop{
 	aspect default {
-		draw circle(30#meter) color: #gamablue;
+		draw circle(40#meter) color: #gamablue;
 		draw circle(20#meter) color: #white;
 		
 	}
@@ -35,14 +35,14 @@ species BusStop parent: MStop{
 
 species BRTStop parent: MStop{
 	aspect default {
-		draw circle(30#meter) color: #darkred;
+		draw circle(40#meter) color: #darkred;
 		draw circle(20#meter) color: #white;
 	}
 }
 
 species TaxiStop parent: MStop{
 	aspect default {
-		draw circle(30#meter) color: #yellowgreen;
+		draw circle(40#meter) color: #darkgreen;
 		draw circle(20#meter) color: #white;
 	}
 }
