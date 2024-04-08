@@ -2,7 +2,7 @@
 * Name: BusStop
 * Description: defines the BusStop species and its related constantes, variables, and methods.
 * 				A BusStop agent represents a location where buses can take or drop off people.
-* Authors: Laatabi
+* Authors: Laatabi, Benchra
 * For the i-Maroc project.
 */
 

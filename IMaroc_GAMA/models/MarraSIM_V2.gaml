@@ -2,15 +2,14 @@
 * Name: Main
 * Description: this is the main file to launch the MarraSIM model.
 * 			The model simulates the public transport traffic in Marrakesh.
-* 			The current version of the model includes the bus network.
-* 			The Grand Taxi network will be included in the next version.
+* 			This version of the model includes the bus network, the BRT network, and the Grand Taxis network.
 * 
-* Authors: Laatabi
+* Authors: Laatabi, Benchra
 * For the i-Maroc project. 
 */
 
 model MarraSIM
-import "classes/PDUZone.gaml"
+import "marrasim_classes/PDUZone.gaml"
 
 global {
 
@@ -49,21 +48,21 @@ global {
 		/*** BUS LINES ***/
 		/**************************************************************************************************************************/
 		// create busses, bus stops, and connections
-		//*
+		/*
 		write "Creating busses and bus stops ...";
 		create BusStop from: marrakesh_bus_stops with: [stop_id::int(get("stop_numbe")), stop_name::get("stop_name")]{
 			stop_zone <- first(PDUZone overlapping self);
 		}
 		
 		create dummy_geom from: marrakesh_bus_lines with: [g_name::get("NAME"),g_direction::int(get("DIR"))];
-		matrix dataMatrix <- matrix(csv_file("../includes/gis/bus_network/bus_lines_stops.csv",true));
+		matrix busMatrix <- matrix(csv_file("../includes/gis/bus_network/bus_lines_stops.csv",true));
 		
 		dummy_geom bsout;
 		dummy_geom bsret;
 		list<point> bsoutpoints;
 		list<point> bsretpoints;
-		loop i from: 0 to: dataMatrix.rows -1 {
-			string bus_line_name <- dataMatrix[0,i];
+		loop i from: 0 to: busMatrix.rows -1 {
+			string bus_line_name <- busMatrix[0,i];
 			
 			if !(bus_line_name in ["L40","L41","L332","L19","BRT1"]) { 
 				// create the bus line if it does not exist yet
@@ -81,21 +80,17 @@ global {
 					current_bl <- my_busline[0];
 				}
 				
-				MStop current_bs <- BusStop first_with (each.stop_id = int(dataMatrix[3,i]));
+				MStop current_bs <- BusStop first_with (each.stop_id = int(busMatrix[3,i]));
 				if current_bs != nil {
-					if int(dataMatrix[1,i]) = DIRECTION_OUTGOING {
-						if length(current_bl.line_outgoing_stops) != int(dataMatrix[2,i]) {
-							write "Error in order of bus stops!" color: #red;
+					ask current_bl {
+						if int(busMatrix[1,i]) = DIRECTION_OUTGOING {
+							do add_stop (DIRECTION_OUTGOING,current_bs,int(busMatrix[2,i]),bsoutpoints);
+						} else {
+							do add_stop (DIRECTION_RETURN,current_bs,int(busMatrix[2,i]),bsretpoints);
 						}
-						current_bl.line_outgoing_stops <+ current_bs::bsoutpoints closest_to current_bs;
-					} else {
-						if length(current_bl.line_return_stops) != int(dataMatrix[2,i]) {
-							write "Error in order of bus stops!" color: #red;
-						}
-						current_bl.line_return_stops <+ current_bs::bsretpoints closest_to current_bs;
 					}
 				} else {
-					write "Error, the bus stop does not exist : " + dataMatrix[3,i] + " (" + dataMatrix[1,i] +")" color: #red;
+					write "Error, the stop does not exist : " + busMatrix[3,i] + " (" + busMatrix[1,i] +")" color: #red;
 					return;
 				}	
 			}
@@ -103,22 +98,14 @@ global {
 
 		// creating n_vehicles for each bus line
 		write "Creating bus vehicles ...";
-		dataMatrix <- matrix(csv_file("../includes/gis/bus_network/bus_lines_data.csv",true));
+		matrix busDataMatrix <- matrix(csv_file("../includes/gis/bus_network/bus_lines_data.csv",true));
 		ask BusLine {
 			int n_vehicles <- 2;
-			if dataMatrix index_of line_name != nil {
-				line_com_speed <- float(dataMatrix[7, int((dataMatrix index_of line_name).y)]) #km/#h;
+			if busDataMatrix index_of line_name != nil {
+				line_com_speed <- float(busDataMatrix[7, int((busDataMatrix index_of line_name).y)]) #km/#h;
 			}
-			loop i from: 0 to: (n_vehicles/2)-1 {
-				create BusVehicle {
-					do init_vehicle(myself, DIRECTION_OUTGOING);
-				}
-			}
-			loop i from: 0 to: (n_vehicles/2)-1 {
-				create BusVehicle {
-					do init_vehicle(myself, DIRECTION_RETURN);
-				}	
-			}
+			do create_vehicles (int(n_vehicles/2), DIRECTION_OUTGOING);
+			do create_vehicles (int(n_vehicles/2), DIRECTION_RETURN);
 		}	
 		
 		// clean
@@ -130,20 +117,19 @@ global {
 		/******************/
 		/*** BRT LINES ***/
 		/**************************************************************************************************************************/
-		//*
+		/*
 		write "Creating BRT stops and lines ...";
 		create BRTStop from: marrakesh_brt_stops with: [stop_id::int(get("ID")), stop_name::get("NAME")]{
 			stop_zone <- first(PDUZone overlapping self);
 		}
 
 		create dummy_geom from: marrakesh_brt_lines with: [g_id::int(get("ID")),g_name::get("NAME")];
-		dataMatrix <- matrix(csv_file("../includes/gis/BRT_network/BRT_lines_stations.csv",true));
+		matrix brtMatrix <- matrix(csv_file("../includes/gis/BRT_network/BRT_lines_stations.csv",true));
 
 		dummy_geom brtgeom;
 		list<point> brtpoints;
-		loop i from: 0 to: dataMatrix.rows -1 {
-			int idbrt <- int(dataMatrix[0,i]);
-
+		loop i from: 0 to: brtMatrix.rows -1 {
+			int idbrt <- int(brtMatrix[0,i]);
 			// create the BRT line if it does not exist yet
 			BRTLine current_bl <- first(BRTLine where (each.line_id = idbrt));
 			if current_bl = nil {
@@ -156,22 +142,13 @@ global {
 				}
 				current_bl <- my_brt[0];
 			}
-			
-			MStop current_bs <- BRTStop first_with (each.stop_id = int(dataMatrix[1,i]));
+			MStop current_bs <- BRTStop first_with (each.stop_id = int(brtMatrix[1,i]));
 			if current_bs != nil {
-				if int(dataMatrix[2,i]) = DIRECTION_OUTGOING {
-					if length(current_bl.line_outgoing_stops) != int(dataMatrix[3,i]) {
-						write "Error in order of BRT stops!" color: #red;
-					}
-					current_bl.line_outgoing_stops <+ current_bs::brtpoints closest_to current_bs;
-				} else {
-					if length(current_bl.line_return_stops) != int(dataMatrix[3,i]) {
-						write "Error in order of BRT stops!" color: #red;
-					}
-					current_bl.line_return_stops <+ current_bs::brtpoints closest_to current_bs;
+				ask current_bl {
+					do add_stop (int(brtMatrix[2,i]),current_bs,int(brtMatrix[3,i]),brtpoints);
 				}
 			} else {
-				write "Error, the BRT stop does not exist : " + dataMatrix[1,i] + " (" + dataMatrix[3,i] +")" color: #red;
+				write "Error, the stop does not exist : " + brtMatrix[1,i] + " (" + brtMatrix[3,i] +")" color: #red;
 				return;
 			}	
 		}
@@ -180,16 +157,8 @@ global {
 		write "Creating BRT vehicles ...";
 		ask BRTLine {
 			int n_vehicles <- 2;
-			loop i from: 0 to: (n_vehicles/2)-1 {
-				create BRTVehicle {
-					do init_vehicle(myself, DIRECTION_OUTGOING);
-				}
-			}
-			loop i from: 0 to: (n_vehicles/2)-1 {
-				create BRTVehicle {
-					do init_vehicle(myself, DIRECTION_RETURN);
-				}	
-			}
+			do create_vehicles (int(n_vehicles/2), DIRECTION_OUTGOING);
+			do create_vehicles (int(n_vehicles/2), DIRECTION_RETURN);
 		}
 		ask dummy_geom { do die; }
 		//*/
@@ -215,30 +184,22 @@ global {
 				
 				MStop start_ts <- TaxiStop first_with (each.stop_id = txout.g_var1);
 				MStop end_ts <- TaxiStop first_with (each.stop_id = txout.g_var2);
-				line_outgoing_stops <+ start_ts::txoutpoints closest_to start_ts;
-				line_outgoing_stops <+ end_ts::txoutpoints closest_to end_ts;
-				line_return_stops <+ end_ts::txretpoints closest_to end_ts;
-				line_return_stops <+ start_ts::txretpoints closest_to start_ts;
+				do add_stop(DIRECTION_OUTGOING, start_ts, 0, txoutpoints);
+				do add_stop(DIRECTION_OUTGOING, end_ts, 1, txoutpoints);
+				do add_stop(DIRECTION_RETURN, end_ts, 0, txretpoints);
+				do add_stop(DIRECTION_RETURN, start_ts, 1, txretpoints);
 			}
 		}
 				
 		write "Creating Taxi vehicles ...";
 		ask TaxiLine {
 			int n_vehicles <- 2;
-			loop i from: 0 to: (n_vehicles/2)-1 {
-				create TaxiVehicle {
-					do init_vehicle(myself, DIRECTION_OUTGOING);
-				}
-			}
-			loop i from: 0 to: (n_vehicles/2)-1 {
-				create TaxiVehicle {
-					do init_vehicle(myself, DIRECTION_RETURN);
-				}	
-			}
+			do create_vehicles (int(n_vehicles/2), DIRECTION_OUTGOING);
+			do create_vehicles (int(n_vehicles/2), DIRECTION_RETURN);
 		}
 		ask dummy_geom { do die; }
 		
-		/****** */
+		/*******/
 		
 		ask BusLine - (BusLine inside city_area) {
 			sub_urban_vehicles <<+ BusVehicle where (each.v_line = self);

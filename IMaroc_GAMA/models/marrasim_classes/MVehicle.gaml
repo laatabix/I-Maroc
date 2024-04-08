@@ -2,29 +2,17 @@
 * Name: BusVehicle
 * Description: defines the BusVehicle species and its related constantes, variables, and methods.
 * 				A BusVehicle agent represents one vehicle that serves a bus line.
-* Authors: Laatabi
+* Authors: Laatabi, Benchra
 * For the i-Maroc project.
 */
 
 model MVehicle
-import "../MarraSIM_V2_params.gaml"
+import "MarraSIM_V2_params.gaml"
 import "MLine.gaml"
 
 global {
-	
+	// list of vehicles of suburban lines
 	list<BusVehicle> sub_urban_vehicles <- [];
-
-	// speed of busses in the urban area
-	float BUS_URBAN_SPEED <- 30#km/#hour;
-	// speed of BRTs and Taxis
-	float BRT_SPEED <- 40#km/#hour;
-	float TAXI_SPEED <- 40#km/#hour;
-	
-	// speed of busses in the suburban area
-	float BUS_SUBURBAN_SPEED <- 60#km/#hour;
-	
-	// the minimum wait time at bus stops
-	float MIN_WAIT_TIME_STOP <- 120#second;
 	
 	// update speed of suburban buslines whenever they in/out of the city
 	reflex update_bus_speeds {
@@ -35,11 +23,10 @@ global {
 			v_speed <- v_line.line_com_speed;
 		}
 	}
-	
 }
 
 /*******************************/
-/**** BusVehicle Species ******/
+/**** MVehicle Species ******/
 /*****************************/
 
 species MVehicle skills: [moving] {
@@ -51,7 +38,8 @@ species MVehicle skills: [moving] {
 	point v_next_loc;
 	float v_stop_wait_time <- -1.0;
 	bool v_in_city <- true;
-	
+		
+	//---------------------------------------//
 	action init_vehicle (MLine mline, int direc) {
 		v_line <- mline;
 		v_current_direction <- direc;	
@@ -66,6 +54,7 @@ species MVehicle skills: [moving] {
 		v_next_loc <- location;
 	}
 	
+	//---------------------------------------//
 	reflex drive {
 		// if the bus has to wait
 		if v_stop_wait_time > 0 {

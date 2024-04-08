@@ -2,7 +2,7 @@
 * Name: PDUZone
 * Description: defines the PDUZone species and its related constantes, variables, and methods.
 * 				A PDUZone agent represents one entity of the PDU (Plan de déplacements urbains) 2009 division.
-* Authors: Laatabi
+* Authors: Laatabi, Benchra
 * For the i-Maroc project.
 */
 
@@ -13,9 +13,6 @@ import "MStop.gaml"
 global {
 	// city area
 	geometry city_area;
-	
-		// simulation starts at 06:00 morning
-	float SIM_START_HOUR <- 6#hour;
 	
 	// format the current time to a printable format [hh:mm:ss]
 	string formatted_time { 
