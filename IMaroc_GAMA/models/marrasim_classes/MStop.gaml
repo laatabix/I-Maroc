@@ -10,9 +10,10 @@ model MStop
 
 import "MLine.gaml"
 import "PDUZone.gaml"
+import "Individual.gaml"
 
 global {
-	
+	float STOP_NEIGHBORING_DISTANCE <- 400#m;
 }
 
 /*******************************/
@@ -23,6 +24,8 @@ species MStop schedules: [] parallel: true {
 	int stop_id;
 	string stop_name;
 	PDUZone stop_zone;
+	
+	list<Individual> stop_waiting_people <- [];
 }	
 
 species BusStop parent: MStop{

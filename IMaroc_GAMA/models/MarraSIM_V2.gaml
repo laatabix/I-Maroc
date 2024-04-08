@@ -10,6 +10,7 @@
 
 model MarraSIM
 import "marrasim_classes/PDUZone.gaml"
+import "marrasim_classes/Individual.gaml"
 
 global {
 
@@ -33,6 +34,10 @@ global {
 	font AFONT0 <- font("Calibri", 16, #bold);
 	
 	
+	float current_affluence <- 0.0;
+	list<float> hourly_affluence <- [0.000,0.000,0.000,0.000,0.000,0.000,0.05,0.050,0.100,0.100,0.050,0.050, // [00:00 -> 11:00]
+								0.100,0.100,0.050,0.050,0.050,0.050,0.100,0.050,0.025,0.0125,0.0125,0.000];// [12:00 ->  23:00]
+	
 	/*******************************/
 	/******** Initialization *******/
 	/*****************************/
@@ -41,19 +46,19 @@ global {
 		
 		// create the environment: city, districts, roads, traffic signals
 		write "Creating the city environment ...";
-		create PDUZone from: marrakesh_pdu with: [pduz_code::int(get("id")), pduz_name::get("label")];
+		create PDUZone from: marrakesh_pdu with: [zone_code::int(get("id")), zone_name::get("label")];
 		city_area <- envelope(PDUZone);
 		
-		/******************/
+		/**************************************************************************************************************************/
 		/*** BUS LINES ***/
 		/**************************************************************************************************************************/
 		// create busses, bus stops, and connections
-		/*
+		//*
 		write "Creating busses and bus stops ...";
 		create BusStop from: marrakesh_bus_stops with: [stop_id::int(get("stop_numbe")), stop_name::get("stop_name")]{
 			stop_zone <- first(PDUZone overlapping self);
 		}
-		
+		/*
 		create dummy_geom from: marrakesh_bus_lines with: [g_name::get("NAME"),g_direction::int(get("DIR"))];
 		matrix busMatrix <- matrix(csv_file("../includes/gis/bus_network/bus_lines_stops.csv",true));
 		
@@ -114,7 +119,7 @@ global {
 			do die;
 		}
 		//*/
-		/******************/
+		/**************************************************************************************************************************/
 		/*** BRT LINES ***/
 		/**************************************************************************************************************************/
 		/*
@@ -162,12 +167,14 @@ global {
 		}
 		ask dummy_geom { do die; }
 		//*/
-		/******************/
+		/**************************************************************************************************************************/
 		/*** TAXI LINES ***/
 		/**************************************************************************************************************************/
-		//*
+		/*
 		write "Creating Taxi lines and stations ...";
-		create TaxiStop from: marrakesh_taxi_stations with: [stop_id::int(get("ID")), stop_name::get("NAME")];
+		create TaxiStop from: marrakesh_taxi_stations with: [stop_id::int(get("ID")), stop_name::get("NAME")]{
+			stop_zone <- first(PDUZone overlapping self);
+		}
 		create dummy_geom from: marrakesh_taxi_lines with:
 					[g_id::int(get("ID_TXLINE")),g_name::get("NAME"),g_direction::int(get("DIR")),
 						g_var1::int(get("ST_START")),g_var2::int(get("ST_END"))];
@@ -199,21 +206,85 @@ global {
 		}
 		ask dummy_geom { do die; }
 		
-		/*******/
-		
 		ask BusLine - (BusLine inside city_area) {
 			sub_urban_vehicles <<+ BusVehicle where (each.v_line = self);
 		}
+		//*/
+		/**************************************************************************************************************************/
+		/*** POPULATION ***/
+		/**************************************************************************************************************************/
+		//*
+		write "Creating population ...";
+		matrix<int> ODMatrix <- matrix<int>(csv_file("../includes/mobility/Bus_OD_Matrix.csv",false));
+		loop i from: 0 to: ODMatrix.rows -1 {
+			PDUZone o_zone <- PDUZone first_with (each.zone_code = i+1);
+			list<MStop> obstops <- BusStop where (each.stop_zone = o_zone);
+			if !empty(obstops) {
+				loop j from: 0 to: ODMatrix.columns -1{
+					PDUZone d_zone <- PDUZone first_with (each.zone_code = j+1);
+					list<MStop> dbstops <- BusStop where (each.stop_zone = d_zone);
+					if !empty(dbstops) {
+						create Individual number: ODMatrix[j,i]{
+							ind_id <- int(self);
+							ind_origin_zone <- o_zone;
+							ind_destin_zone <- d_zone;
+							ind_origin_stop <- one_of(obstops);
+							// distance between origin and destination must be greater than the neighboring distance, or take a walk !
+							ind_destin_stop <- one_of(dbstops where (each distance_to ind_origin_stop > STOP_NEIGHBORING_DISTANCE));
+						}
+					}
+				}
+			}	
+		}
+		write "Total population: " + length(Individual);
 		
 		write "--+-- END OF INIT --+--" color:#green;		
 	}
 	
 	/*** end of init definition ***/
 	
+	
+	int Nminutes <- 10;
+	
+	// generate travellers each Nminutes
+	reflex going_on when: int(time) mod int(Nminutes#minute) = 0 {
+		
+		int tt <- int(SIM_START_HOUR) + int(time);
+		string hh <- get_time_frag(tt, 1);
+		
+		if int(hh) = 24 { // midight, end of a day simulation
+			do pause;
+		}
+		/* ####### */
+		if int(time) mod int(1#hour) = 0 {
+			if int(hh) >= 6 and int(hh) <= 23 { // 06:00 - 23:00 range only
+				current_affluence <- hourly_affluence[int(hh)];
+			} else {
+				current_affluence <- 0.0;
+			}
+		}
+		/* ####### */
+		int total_travellers <- 0;
+		ask PDUZone {
+			list<Individual> zone_people <- Individual where (each.ind_origin_zone = self and
+												!(each.ind_moving or each.ind_arrived));
+			int nn <- int(current_affluence / (60/Nminutes) * length(zone_people));
+			if nn > 0 {
+				ask nn among (zone_people) {
+					ind_moving <- true;
+					ind_waiting_stop <- ind_origin_stop;
+					ind_waiting_stop.stop_waiting_people <+ self;
+					ind_times <+ [int(time)]; // waiting time, first trip
+				}
+				total_travellers <- total_travellers + nn;	
+			}
+		}
+		write world.formatted_time() + total_travellers + " new people are travelling...";
+	}
+	
 	/*******************************************************************************************************************************/
 	/*******************************************************************************************************************************/
 }
-
 
 species dummy_geom {
 	int g_id;

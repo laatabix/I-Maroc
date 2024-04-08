@@ -42,8 +42,8 @@ global {
 /*****************************/
 
 species PDUZone schedules: [] parallel: true {
-	int pduz_code;
-	string pduz_name;
+	int zone_code;
+	string zone_name;
 	
 	aspect default {
 		draw shape color: #whitesmoke border: #black;
