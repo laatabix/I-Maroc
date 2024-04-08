@@ -28,7 +28,7 @@ global {
 	int trip_scale <- 1;
 	float central_district_travel_weight <- 0.7;
 	
-	float infection_rate <- 0.5; 
+	float infection_rate <- 0.4; 
 	float incubation_to_infection_rate <- 0.2;
 	float recovery_rate <- 0.13;
 	
@@ -134,6 +134,7 @@ species district {
 	float E <-0.0;
 	float I <-0.0;
 	float R <-0.0;
+	float nb_infections <- 0.0;
 	
 	float test_pop -> S+E+I+R;
 	
@@ -151,7 +152,7 @@ species district {
 //		int nb_infections <- int(ceil(infection_rate * I * S/pop));
 //		int to_infected <- int(ceil(incubation_to_infection_rate*E));
 //		int to_recovered <- int(ceil(recovery_rate*I));
-		float nb_infections <- infection_rate * total_I * total_S/pop;
+		nb_infections <- infection_rate * total_I * total_S/pop;
 		float to_infected <- incubation_to_infection_rate*total_E;
 		float to_recovered <- recovery_rate*total_I;
 		
@@ -163,8 +164,8 @@ species district {
 		ask travelers_at_district{
 			self.R <- max(0,self.R + (total_I>0?to_recovered*self.I/total_I:0));	
 			self.I <- max(0,self.I + (total_E>0?to_infected *self.E/total_E:0) - (total_I>0?to_recovered*self.I/total_I:0));
-			self.E <- max(0,self.E + (total_S>0?nb_infections* self.S/total_S:0) - (total_E>0?to_infected *self.E/total_E:0));
-			self.S <- max(0,self.S - (total_S>0?nb_infections * self.S/total_S:0));
+			self.E <- max(0,self.E + (total_S>0?myself.nb_infections* self.S/total_S:0) - (total_E>0?to_infected *self.E/total_E:0));
+			self.S <- max(0,self.S - (total_S>0?myself.nb_infections * self.S/total_S:0));
 		}
 	}
 	
@@ -175,7 +176,10 @@ species district {
 		}else{
 			draw shape color:#white border:#black;
 		}
-		draw name at:{location.x,location.y,(pop/100)*1.1} anchor: #center color: #black font: font("Helvetica", 10 );
+		loop i from:1 to: floor(nb_infections) step: 1 {
+			draw circle(40) color: #red at: any_location_in(self.shape);
+		}
+		draw name at:{location.x,location.y,10} anchor: #center color: #black font: font("Helvetica", 10 );
 	}
 	
 	aspect pop {
@@ -185,7 +189,6 @@ species district {
 //		draw shape+0.1 depth:pop/100 color: rgb(255,255,255,0.25) border:rgb(255,255,255,0.75) width:1;
 //			
 		draw string(int(E+I)) at:{location.x,location.y,(pop/100)*1.1} color: #black font: font("Helvetica", 10 );
-		
 //		draw shape depth:pop/100 color: blend(#gamared,#white,pop/max_pop_per_district_2023) border:blend(#gamared,#white,pop/max_pop_per_district_2023) width:3;
 //		draw string(pop) at:{location.x,location.y,(pop/100)*1.1} color: #black font: font("Helvetica", 10 );
 
