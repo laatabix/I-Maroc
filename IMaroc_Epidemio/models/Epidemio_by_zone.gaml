@@ -313,38 +313,9 @@ species district {
 	}		
 	aspect od {
 		draw shape color: blend(#gamared,#white,pop_2008/140000) border:blend(#gamared,#white,pop_2008/140000) width:3;
-//		ask (link where (each.origin.id=id)){
-//			if(weight>weight_threshold){
-//			  //draw curve(origin.location,destination.location,0.5,20, 0.8,90) end_arrow: 100  width:(weight/max_weight)*100 color:list_of_color[origin.id];
-//			  draw curve(origin.location,destination.location,weight/max_weight*2,100, 0.8,90) end_arrow: 100  width:(weight/max_weight)*50 color:blend(#gamared,#black,weight/max_weight);	
-//			}
-//		}
 	}	
 }
 
-
-
-
-//species zone{
-//	int id;
-//	int pop_2014;
-//	int pop_2023;
-//	int pop_2030;
-//	aspect pop_2014{
-//		draw shape depth:pop_2014/100 color: blend(#gamared,#white,pop_2014/max_pop_per_zone_2014);
-//		draw string(pop_2014) at:{location.x,location.y,(pop_2014/100)*1.1} color: #black font: font("Helvetica", 10 );
-//	}
-//	
-//	aspect pop_2023{
-//		draw shape depth:pop_2023/100 color: blend(#gamared,#white,pop_2023/max_pop_per_zone_2023);
-//		draw string(pop_2023) at:{location.x,location.y,(pop_2023/100)*1.1} color: #black font: font("Helvetica", 10 );
-//	}
-//	
-//	aspect pop_2030{
-//		draw shape depth:pop_2030/100 color: blend(#gamared,#white,pop_2030/max_pop_per_zone_2030);
-//		draw string(pop_2030) at:{location.x,location.y,(pop_2030/100)*1.1} color: #black font: font("Helvetica", 10 );
-//	}
-//}
 
 
 experiment IMaroc type: gui {
@@ -352,7 +323,7 @@ experiment IMaroc type: gui {
 	float h -> simulation.shape.height;
 	float minimum_cycle_duration <- 0.1;
 	output autosave: true {
-		layout tabs: false consoles: false parameters: false navigator: false controls: false toolbars: false tray: false;
+		layout tabs: false consoles: false parameters: false navigator: false toolbars: false tray: false;//controls: false
 //		display Population_2008 type: 3d axes:true background:rgb(0,50,0){
 //			graphics "info"{ 
 //				draw "I-MAROC" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
@@ -403,7 +374,7 @@ experiment comparison type: gui {
 	
 	permanent {	
 		display Epidemics type: 2d toolbar:false background:rgb(50,50,50) {
-			chart "Epidemics" type: series  background:rgb(50,50,50) x_range: [0,220] 
+			chart "Epidemics" type: series  background:rgb(0,50,0) x_range: [0,220] 
 					y_range: [0,1000000] color:#white tick_line_color: #white legend_font: font("Arial", 12)
 					label_font: font("Arial", 12){
 				data "Prevalence" value: simulations[0].city_I color: rgb(#red,0.9) line_visible: false marker_shape: marker_circle marker_size: 0.5;
@@ -416,8 +387,8 @@ experiment comparison type: gui {
 	}
 	
 	output autosave: true{
-//		layout horizontal([0::4000,1::4000,2::4000]) tabs:true editors: false;
-		layout vertical([horizontal([0::100,1::100])::100,2::100]) tabs:false editors: false consoles: false parameters: false navigator: false toolbars: false tray: false controls: false;
+//		layout vertical([horizontal([0::100,1::100])::100,2::100]) tabs:false editors: false consoles: false parameters: false navigator: false toolbars: false tray: false controls: false;
+		layout horizontal([0::100,vertical([1::100,2::100])::100]) tabs:false editors: false consoles: false parameters: false navigator: false toolbars: false tray: false;
 		display Propagation type: 3d axes:false toolbar:false background:rgb(0,50,0) camera: #default{
 			camera #default locked: true location: {w *0.55, h * 1.3, w*2/3 } target: {w *0.55, h * 0.6, 0} dynamic: true;
 			graphics "info"{ 
