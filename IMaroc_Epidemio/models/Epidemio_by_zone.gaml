@@ -11,7 +11,15 @@ model simpleShapefileLoading
 global {	
 	
 	shape_file zonage_pdu0_shape_file <- shape_file("../includes/gis/PDU_zoning/zonage_pdu.shp");
-	csv_file ODMatrix <- csv_file("../includes/mobility/PublicTrans_OD_Matrix.csv");
+//	csv_file ODMatrix <- csv_file("../includes/mobility/PublicTrans_OD_Matrix.csv");
+	shape_file kech_roads0_shape_file <- shape_file("../includes/gis/roads/kech_roads.shp");
+	list<csv_file> ODMatrices <- [csv_file("../includes/mobility/Car_OD_Matrix.csv"),csv_file("../includes/mobility/PublicTrans_OD_Matrix.csv"),csv_file("../includes/mobility/Moped_OD_Matrix.csv"),csv_file("../includes/mobility/Pedestrian_OD_Matrix.csv")];
+	list<string> modes <- ['Cars','Public transport','2 wheels','Pedestrians'];
+	list<float> modes_weights <- [0.1,0.5,0.05,0.02];
+
+	list<rgb> color_per_mode <- [rgb(231, 76, 60), rgb(52, 152, 219), rgb(243, 156, 18), rgb(46, 204, 113)];
+	int nb_transportation_modes <-length(ODMatrices);
+
 //	map<int,rgb> color_per_mode <- [0::rgb(52,152,219), 1::rgb(192,57,43), 2::rgb(161,196,90), 3::#magenta,4::#cyan];	
 //	list<rgb> list_of_color <- list_with(27,rnd_color(255));
 	rgb background<-#black;
@@ -22,8 +30,11 @@ global {
 	
 	int max_weight;
 	int weight_threshold<-1500;
+	int link_threshold <- 50;
 	int max_pop_per_district_2008;
 	int max_pop_per_district_2023;
+	
+	int focus_half_life <- 3;
 	
 	int trip_scale <- 1;
 	float central_district_travel_weight <- 0.2;
@@ -46,11 +57,10 @@ global {
 	string moment_of_the_day;
 	int current_propagation_step <- 0;
 	string start_district_name;
-	
-//	int incubation_cycle_duration <- 6;
-//	float infection_cycle_duration <- 10;
+	list<int> modal_part <- list_with(nb_transportation_modes,0);
 	
 	init {
+		create road from: kech_roads0_shape_file;
 		//creation of the district shapefile
 		create district from: zonage_pdu0_shape_file with:[id::int(get("id")),pop_2008::int(get("pop2008")),pop::int(get("pop2023")), name::string(get("label")), zone::string(get("agregate"))];
 		ask district{
@@ -69,43 +79,55 @@ global {
 		write "R0: "+R0;
 		create district_transparency;
 		
-		//convert the file into a matrix
-		int total_trips <- 0;
-		matrix data <- matrix(ODMatrix);
-		loop i from: 0 to: data.rows -1{
-//			int tot <- 0;
-//			int Sinit <- first(district where (each.id=i+1)).S;
-			loop j from: 0 to: data.columns - 1{
+		//convert the files into matrices
+		list<matrix> data <- [];
+		loop m over: ODMatrices {
+			data <- data + [matrix(m)];
+		}
+		write length(data);
+		loop i from: 0 to: data[0].rows -1{
+			loop j from: 0 to: data[0].columns - 1{
 				create travelers{	
 					origin <- first(district where (each.id=i+1));
 					destination <- first(district where (each.id=j+1));
-					S <- int(data[j,i])*trip_scale;
-//					tot <- tot + int(data[j,i]);
-					
-					if (origin.name in central_districts) and !(destination.name in central_districts){
-						S <- int(round(S*(1-central_district_travel_weight)));
+					loop k from: 0 to: nb_transportation_modes - 1{
+						Ss[k] <- round(int(data[k][j,i])*modes_weights[k]);
+						if (origin.name in central_districts) and !(destination.name in central_districts){
+							Ss[k] <- int(round(Ss[k]*(1-central_district_travel_weight)));
+						}
+						if !(origin.name in central_districts) and (destination.name in central_districts){
+							Ss[k] <- int(round(Ss[k]*(1+central_district_travel_weight)));
+						}
 					}
-					if !(origin.name in central_districts) and (destination.name in central_districts){
-						S <- int(round(S*(1+central_district_travel_weight)));
-					}
-					origin.S <- origin.S - S;
-					total_trips <- total_trips + int(S);
+					nb_travelers <- sum(Ss);
 				}
 				
 			}	
-//			write "district "+i+': '+ Sinit+' '+tot+'('+first(district where (each.id=i+1)).S+')';
-		}		
+		}	
+		int total_trips <- travelers sum_of(each.S);	
 		write "Total trips per day: "+total_trips;
 		max_weight <- max(travelers collect each.nb_travelers);
 		max_pop_per_district_2008<-max(district collect each.pop_2008);
 		max_pop_per_district_2023<-max(district collect each.pop);
 		ask district{
-			if S < 0 {
-				write "Error: district "+self.name+' has negative initial population ('+S+')';
-				ask world {do pause;}
-			}
 			travelers_from_this_district <- travelers where(each.origin = self);
 			travelers_to_this_district <- travelers where(each.destination = self);
+			int old_S <- S;
+//			write "District "+int(self)+" ("+self.name+") pop: "+S+", travels: "+travelers_from_this_district sum_of(each.S);
+			S <- S - travelers_from_this_district sum_of(each.S);
+			if S < 0 {
+				write "Error: district "+self.name+' has negative initial population ('+S+'). Details:';
+				write "Pop before travels: "+old_S;
+				loop k from: 0 to: nb_transportation_modes - 1{
+					write ""+modes[k]+": "+ travelers_from_this_district sum_of(each.Ss[k]);
+				}
+				write '';
+				ask world {do pause;}
+			}
+		}
+		// computation of the modal_part
+		loop k from: 0 to: nb_transportation_modes - 1 {
+			modal_part[k] <- travelers sum_of(each.Ss[k]);
 		}
 	}
 	
@@ -153,19 +175,25 @@ species travelers{
 	district destination;
 //	int weight;
 	
-	int S;
-	int E;
-	int I;
-	int Q;
-	int R;
+	list<int> Ss <- list_with(nb_transportation_modes,0);
+	list<int> Es <- list_with(nb_transportation_modes,0);
+	list<int> Is <- list_with(nb_transportation_modes,0);
+	list<int> Qs <- list_with(nb_transportation_modes,0);
+	list<int> Rs <- list_with(nb_transportation_modes,0);
+	
+	int S -> sum(Ss);	
+	int E -> sum(Es);
+	int I -> sum(Is);
+	int Q -> sum(Qs);
+	int R -> sum(Rs);
 	
 	int propagation_level <- -1;
 	
-	int nb_travelers -> S+E+I+Q+R;
+	int nb_travelers;// -> S+E+I+Q+R;
 	
 	aspect default{
-		if (E+I>50){
-			rgb lineColor <- blend(#gamared,#white,10*(E+I)/(S+E+I+R));
+		if (E+I > link_threshold){
+			rgb lineColor <- blend(#gamared,#white,10*(E+I)/(S+I+E+R));
 			draw curve(origin.location,destination.location,0.5,20, 0.8,90) end_arrow: 100  width:(nb_travelers/max_weight)*5 color:lineColor;		
 		}
 //		if (nb_travelers > weight_threshold*trip_scale){
@@ -267,22 +295,39 @@ species district {
 		cycle_total_infections <- nb_infections;
 
 		ask travelers_at_district{
-			nb_infections <- binomial(self.S,infection_rate);
-			to_infected <- binomial(self.E,incubation_to_infection_rate);
-			to_quarantine <- binomial(self.I,quarantine_rate);
-			infected_to_recovered <- binomial(self.I,recovery_rate);
-			quarantined_to_recovered <- binomial(self.Q,recovery_rate);	
 			
-			self.S <- self.S - nb_infections;
-			self.E <- self.E + nb_infections - to_infected;
-			self.I <- self.I + to_infected - to_quarantine - infected_to_recovered;
-			self.Q <- self.Q + to_quarantine - quarantined_to_recovered;
-			self.R <- self.R + infected_to_recovered + quarantined_to_recovered;
+			loop i from: 0 to: nb_transportation_modes-1{
+				nb_infections <- binomial(self.Ss[i],infection_rate);
+				to_infected <- binomial(self.Es[i],incubation_to_infection_rate);
+				to_quarantine <- binomial(self.Is[i],quarantine_rate);
+				infected_to_recovered <- binomial(self.Is[i],recovery_rate);
+				quarantined_to_recovered <- binomial(self.Qs[i],recovery_rate);	
+				if (infected_to_recovered + to_quarantine > Is[i]){// too many individuals leaving compartment I
+					to_quarantine <- Is[i] - infected_to_recovered;
+				}
+				self.Ss[i] <- self.Ss[i] - nb_infections;
+				self.Es[i] <- self.Es[i] + nb_infections - to_infected;
+				self.Is[i] <- self.Is[i] + to_infected - to_quarantine - infected_to_recovered;
+				self.Qs[i] <- self.Qs[i] + to_quarantine - quarantined_to_recovered;
+				self.Rs[i] <- self.Rs[i] + infected_to_recovered + quarantined_to_recovered;
+				
+				myself.cycle_total_infections <- myself.cycle_total_infections + nb_infections;
+			}
 			
-			myself.cycle_total_infections <- myself.cycle_total_infections + nb_infections;
 		}
 	}
 	
+	reflex create_focuses{
+		int i <- 0;
+		loop while: i < cycle_total_infections {
+			create focus{
+				location <- any_location_in(myself.shape);
+				number <- round(0.6+gamma_rnd(1.0,4.0));
+//				write number;
+				i <- i + number;
+			} 
+		}
+	}
 	
 	aspect base{
 		if zone in central_districts{
@@ -290,9 +335,10 @@ species district {
 		}else{
 			draw shape color:#white border:#black;
 		}
-		loop i from:1 to: floor(cycle_total_infections) step: 1 {
-			draw circle(40) color: #red at: any_location_in(self.shape);
-		}
+		
+//		loop i from:1 to: floor(cycle_total_infections) step: 1 {
+//			draw circle(40) color: #red at: any_location_in(self.shape);
+//		}
 		draw name at:{location.x,location.y,10} anchor: #center color: #black font: font("Helvetica", 10 );
 	}
 	
@@ -316,22 +362,41 @@ species district {
 	}	
 }
 
+species road{
+	aspect default {
+		draw shape color:rgb(50,100,50) border:#black width:1;
+	}
+}
+
+species focus{
+	int duration <- 0;
+	int number;
+	
+	reflex fade{
+		duration <- duration + 1;
+		if duration > 2 * focus_half_life{
+			do die;
+		}
+	}
+	
+	
+	aspect default{
+		float alpha <- duration <= focus_half_life? duration/focus_half_life: 1 - (duration -focus_half_life)/focus_half_life;
+		draw circle(10*sqrt(number)) color: rgb(#red,alpha);
+	}
+	
+	
+}
+
 
 
 experiment IMaroc type: gui {
 	float w -> simulation.shape.width; 
 	float h -> simulation.shape.height;
 	float minimum_cycle_duration <- 0.1;
-	output autosave: true {
-		layout tabs: false consoles: false parameters: false navigator: false toolbars: false tray: false;//controls: false
-//		display Population_2008 type: 3d axes:true background:rgb(0,50,0){
-//			graphics "info"{ 
-//				draw "I-MAROC" at:{0,-1500} color: #white font: font("Helvetica", 20 , #bold);
-//				draw "Population (2008): "  + sum(district collect each.pop_2008) at:{0,-1000}  color: #white font: font("Helvetica", 14 , #bold);
-//			}
-//			species district aspect:pop_2008 position:{0,0,-0.01} transparency:0.25;
-//		}
-		
+	output autosave: false {
+		layout vertical([horizontal([0::100,1::100])::100,horizontal([2::100,horizontal([3::100,4::100])::100])::100])
+			;// tabs: false consoles: false parameters: false navigator: false toolbars: false tray: false;//controls: false
 		display Population type: 3d axes:false toolbar:false background:rgb(0,50,0){
 			camera #default locked: true location: {w *0.55, h * 1.3, w*2/3 } target: {w *0.55, h * 0.6, 0} dynamic: true;
 			graphics "info"{ 		
@@ -350,12 +415,28 @@ experiment IMaroc type: gui {
 			}
 			species district aspect:base position:{0,0,-0.01} transparency:0.25;
 			species travelers aspect: propagation;
+			species focus;
+			species road transparency: 0.8;
 		}
 		display "Epidemics" toolbar:false background:rgb(0,50,0){
 		    chart "Epidemics" type: series  background:rgb(0,50,0) color:#white tick_line_color: #white{
 				data "Prevalence" value: city_I color: #red marker: false;
 				data "Total recoveries" value: city_R color: #orange marker: false;
 				data "Quarantined" value: city_Q color: rgb(100,100,255) marker: false;
+		    }
+		}
+		display "Transportation modes" toolbar: false background: rgb(0,50,0){
+			chart "Modality part" type: pie  background:rgb(0,50,0) color:#white{
+				loop i from: 0 to: nb_transportation_modes-1{
+					data modes[i] value: modal_part[i] color: color_per_mode[i];
+				}
+		    }
+		}
+		display "Infection per modes" toolbar: false background: rgb(0,50,0){
+		    chart "Infection propagation per mode" type: pie  background:rgb(0,50,0) color:#white{
+				loop i from: 0 to: nb_transportation_modes-1{
+					data modes[i] value: travelers sum_of (each.Is[i]) color: color_per_mode[i];
+				}
 		    }
 		}
 	}
@@ -368,8 +449,7 @@ experiment comparison type: gui {
 	float minimum_cycle_duration <- 0.1;
 	
 	init {
-		create simulation with: [quarantine_rate:: 0.04];
-		
+		create simulation with: [quarantine_rate:: 0.04];	
 	}
 	
 	permanent {	
@@ -388,7 +468,7 @@ experiment comparison type: gui {
 	
 	output autosave: true{
 //		layout vertical([horizontal([0::100,1::100])::100,2::100]) tabs:false editors: false consoles: false parameters: false navigator: false toolbars: false tray: false controls: false;
-		layout horizontal([0::100,vertical([1::100,2::100])::100]) tabs:false editors: false consoles: false parameters: false navigator: false toolbars: false tray: false;
+		layout horizontal([0::100,vertical([1::100,2::100])::100]) tabs:false editors: false consoles: false parameters: false navigator: false toolbars: false tray: false controls: false;
 		display Propagation type: 3d axes:false toolbar:false background:rgb(0,50,0) camera: #default{
 			camera #default locked: true location: {w *0.55, h * 1.3, w*2/3 } target: {w *0.55, h * 0.6, 0} dynamic: true;
 			graphics "info"{ 
@@ -397,6 +477,8 @@ experiment comparison type: gui {
 			}
 			species district aspect:base position:{0,0,-0.01} transparency:0.25;
 			species travelers aspect: default;
+			species focus;
+			species road transparency: 0.8;
 		}
 	}
 }
