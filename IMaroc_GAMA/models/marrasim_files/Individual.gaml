@@ -42,6 +42,7 @@ species Individual parallel: true {
 										each.trip_line = li and each.trip_line_direction = dir);
 		if mtp = nil {
 			create MTrip returns: mytrip {
+				self.trip_id <- int(self);
 				self.trip_start_stop <- stop1;
 				self.trip_end_stop <- stop2;
 				self.trip_line <- li;
@@ -49,20 +50,20 @@ species Individual parallel: true {
 				
 				graph mygraph <- li.line_outgoing_graph;
 				
-				if li.line_type = LINE_TYPE_TAXI {
+				/*if li.line_type = LINE_TYPE_TAXI {
 					if dir = DIRECTION_RETURN {
 						mygraph <- li.line_return_graph;
 					}
 					self.trip_ride_distance <- int(path_between(mygraph, stop1.stop_connected_taxi_lines at (TaxiLine(li)::dir),
 															stop2.stop_connected_taxi_lines at (TaxiLine(li)::dir)).shape.perimeter);
-				} else {
+				} else {*/
 					map<MStop,point> mystops <- li.line_outgoing_stops;
 					if dir = DIRECTION_RETURN {
 						mystops <- li.line_return_stops;
 						mygraph <- li.line_return_graph;
 					}
 					self.trip_ride_distance <- int(path_between(mygraph, mystops at stop1, mystops at stop2).shape.perimeter);
-				}
+				//}
 			}
 			return mytrip[0];
 		} else {
@@ -83,10 +84,10 @@ species Individual parallel: true {
 		
 		//----------------------------- single (one line trips)
         loop single_line over: (remove_duplicates(ind_origin_stop.stop_neighbors accumulate each.stop_lines) +
-        					remove_duplicates(ind_origin_stop.stop_connected_taxi_lines.keys))
+        					remove_duplicates(ind_origin_stop.stop_connected_taxi_lines))
         				inter
         					(remove_duplicates(ind_destin_stop.stop_neighbors accumulate each.stop_lines) + 
-        						remove_duplicates(ind_destin_stop.stop_connected_taxi_lines.keys)) {
+        						remove_duplicates(ind_destin_stop.stop_connected_taxi_lines)) {
         	
         	if single_line.key.line_type = LINE_TYPE_TAXI {
         		stop1 <- ind_origin_stop;
@@ -107,32 +108,36 @@ species Individual parallel: true {
 		//----------------------------- double (two lines trips)
 		list<pair<MLine,int>> omit_lines <- [];
         loop first_line over: (remove_duplicates(ind_origin_stop.stop_neighbors accumulate each.stop_lines) +
-        	 					remove_duplicates(ind_origin_stop.stop_connected_taxi_lines.keys)) - single_lines {
+        	 					remove_duplicates(ind_origin_stop.stop_connected_taxi_lines)) - single_lines {
         	omit_lines <- single_lines + [(first_line.key::DIRECTION_OUTGOING),(first_line.key::DIRECTION_RETURN)];
-
+			
+			mstops1 <- first_line.value = DIRECTION_OUTGOING ? first_line.key.line_outgoing_stops.keys :
+        														first_line.key.line_return_stops.keys;
         	if first_line.key.line_type = LINE_TYPE_TAXI {
         		stop1 <- ind_origin_stop;
-        		mstops1 <- first_line.value = DIRECTION_OUTGOING ? TaxiLine(first_line.key).tl_connected_stops_outgoing :
-        												TaxiLine(first_line.key).tl_connected_stops_return;
-        		mstops1 <- (copy_between(mstops1, (mstops1 index_of stop1)+1, length(mstops1)) - stop1.stop_neighbors);
+        		//mstops1 <- first_line.value = DIRECTION_OUTGOING ? TaxiLine(first_line.key).tl_connected_stops_outgoing :
+        			//									TaxiLine(first_line.key).tl_connected_stops_return;
+        		//mstops1 <- (copy_between(mstops1, (mstops1 index_of stop1)+1, length(mstops1)) - stop1.stop_neighbors);
         	} else {
-        		mstops1 <- first_line.value = DIRECTION_OUTGOING ? first_line.key.line_outgoing_stops.keys :
-        														first_line.key.line_return_stops.keys;
+        		
         		stop1 <- mstops1 contains ind_origin_stop ? ind_origin_stop : mstops1 closest_to ind_origin_stop;
         		// only stops that come after the considered stop and are in neighbors
-        		mstops1 <- (copy_between(mstops1, (mstops1 index_of stop1)+1, length(mstops1)) - stop1.stop_neighbors);
+        		//mstops1 <- (copy_between(mstops1, (mstops1 index_of stop1)+1, length(mstops1)) - stop1.stop_neighbors);
            	}
+           	mstops1 <- (copy_between(mstops1, (mstops1 index_of stop1)+1, length(mstops1)) - stop1.stop_neighbors);
            	
             loop second_line over: (remove_duplicates(ind_destin_stop.stop_neighbors accumulate each.stop_lines) +
-            						remove_duplicates(ind_destin_stop.stop_connected_taxi_lines.keys)) - omit_lines {
-
+            						remove_duplicates(ind_destin_stop.stop_connected_taxi_lines)) - omit_lines {
+				
+				mstops2 <- second_line.value = DIRECTION_OUTGOING ? second_line.key.line_outgoing_stops.keys :
+            														second_line.key.line_return_stops.keys;
             	if second_line.key.line_type = LINE_TYPE_TAXI {
-        			mstops2 <- second_line.value = DIRECTION_OUTGOING ? TaxiLine(second_line.key).tl_connected_stops_outgoing :
-        												TaxiLine(second_line.key).tl_connected_stops_return;
+        			//mstops2 <- second_line.value = DIRECTION_OUTGOING ? TaxiLine(second_line.key).tl_connected_stops_outgoing :
+        				//								TaxiLine(second_line.key).tl_connected_stops_return;
         			stop2 <- ind_destin_stop;
         		} else {
-        			mstops2 <- second_line.value = DIRECTION_OUTGOING ? second_line.key.line_outgoing_stops.keys :
-            														second_line.key.line_return_stops.keys;
+        			//mstops2 <- second_line.value = DIRECTION_OUTGOING ? second_line.key.line_outgoing_stops.keys :
+            			//											second_line.key.line_return_stops.keys;
 	            	stop2 <- mstops2 contains ind_destin_stop ? ind_destin_stop : mstops2 closest_to ind_destin_stop;
 				}
 				mstops2 <- (copy_between(mstops2, 0, (mstops2 index_of stop2)+1) - stop2.stop_neighbors);

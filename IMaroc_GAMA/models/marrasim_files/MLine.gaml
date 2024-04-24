@@ -18,8 +18,11 @@ global {
 	int LINE_TYPE_TAXI <- 23;
 	
 	int DEFAULT_NUMBER_BUS <- 2;
-	int DEFAULT_NUMBER_BRT <- 2;
-	int DEFAULT_NUMBER_TAXI <- 2;
+	int DEFAULT_NUMBER_BRT <- 4;
+	int DEFAULT_NUMBER_TAXI <- 10;
+	
+	float DEFAULT_BUS_INTERVAL_TIME <- 20#minute;
+	float DEFAULT_TAXI_INTERVAL_TIME <- 10#minute;
 }
 
 /*******************************/
@@ -31,6 +34,7 @@ species MLine schedules: [] parallel: true {
 	string line_name;
 	int line_type;
 	float line_com_speed <- BUS_URBAN_SPEED;
+	float line_interval_time_m <- DEFAULT_BUS_INTERVAL_TIME;
 	map<MStop,point> line_outgoing_stops <- []; // list of bus stops on an outgoing path
 	map<MStop,point> line_return_stops <- []; // bus stops on the return path
 	geometry line_outgoing_shape;	
@@ -51,16 +55,25 @@ species MLine schedules: [] parallel: true {
 	//---------------------------------------//
 	action create_vehicles (int num, int direction) {
 		if self.line_type = LINE_TYPE_BUS {
-			create BusVehicle number: num {
-				do init_vehicle(myself, direction);
+			loop i from: 0 to: num-1 {
+				create BusVehicle {
+					do init_vehicle(myself, direction);
+					v_stop_wait_time <- (myself.line_interval_time_m * i);
+				}
 			}
 		} else if self.line_type = LINE_TYPE_BRT {
-			create BRTVehicle number: num {
-				do init_vehicle(myself, direction);
+			loop i from: 0 to: num-1 {
+				create BRTVehicle {
+					do init_vehicle(myself, direction);
+					v_stop_wait_time <- (myself.line_interval_time_m * i);
+				}
 			}
 		} else if self.line_type = LINE_TYPE_TAXI {
-			create TaxiVehicle number: num {
-				do init_vehicle(myself, direction);
+			loop i from: 0 to: num-1 {
+				create TaxiVehicle {
+					do init_vehicle(myself, direction);
+					v_stop_wait_time <- (myself.line_interval_time_m * i);
+				}
 			}
 		}
 	}
@@ -102,22 +115,38 @@ species MLine schedules: [] parallel: true {
 			}
 		}
 		return -1;
+	}
+	
+	//---------------------------------------//
+	// return the next stop given the direction and another stop
+	MStop next_bs (int dir, MStop ss) {
+		if dir = DIRECTION_OUTGOING {
+			int indx <- line_outgoing_stops.keys index_of ss;
+			return indx < length(line_outgoing_stops.keys)-1 ? line_outgoing_stops.keys[indx+1] : nil;
+		} else {
+			int indx <- line_return_stops.keys index_of ss;
+			return indx < length(line_return_stops.keys)-1 ? line_return_stops.keys[indx+1] : nil;
+		}
 	}	
 }
 
 species BusLine parent: MLine {
-	int line_type <- LINE_TYPE_BUS;
+	
+	init {
+		line_type <- LINE_TYPE_BUS;
+	}
 	
 	aspect default {
 		draw (shape+10#meter) color: #gamablue;
 		draw (shape+5#meter) color: #white;
 	}
-	
-	
 }
 
 species BRTLine parent: MLine {
-	int line_type <- LINE_TYPE_BRT;
+	
+	init {
+		line_type <- LINE_TYPE_BRT;
+	}
 	
 	aspect default {
 		draw (shape+10#meter) color: #darkred;
@@ -126,18 +155,21 @@ species BRTLine parent: MLine {
 }
 
 species TaxiLine parent: MLine {
-	int line_type <- LINE_TYPE_TAXI;
-	list<MStop> tl_connected_stops_outgoing <- [];
-	list<MStop> tl_connected_stops_return <- [];
+	
+	init {
+		line_type <- LINE_TYPE_TAXI;
+		line_interval_time_m <- DEFAULT_TAXI_INTERVAL_TIME;
+	}
 	
 	aspect default {
 		draw (shape+10#meter) color: #darkgreen;
 		draw (shape+5#meter) color: #white;
 	}
 	
-	int can_link_stops (MStop origin_stop, MStop destin_stop) {
+	/*int can_link_stops (MStop origin_stop, MStop destin_stop) {
 		try {
 			point arrival_stop <- last(line_outgoing_stops);
+			//point ostop <- origin_stop.stop_connected_taxi_lines at (self::DIRECTION_OUTGOING);
 			point ostop <- origin_stop.stop_connected_taxi_lines at (self::DIRECTION_OUTGOING);
 			point dstop <- destin_stop.stop_connected_taxi_lines at (self::DIRECTION_OUTGOING);
 			float o_dis <- path_between(line_outgoing_graph, ostop, arrival_stop).shape.perimeter;
@@ -158,7 +190,7 @@ species TaxiLine parent: MLine {
 		} catch {
 			return -1;	
 		}
-	}		
+	}*/		
 }
 
 /*** end of species definition ***/

@@ -24,6 +24,7 @@ global {
 
 species MTrip schedules: [] {
 	
+	int trip_id;
 	MStop trip_start_stop;
 	MStop trip_end_stop;
 	

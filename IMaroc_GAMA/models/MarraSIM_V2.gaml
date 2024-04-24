@@ -110,11 +110,19 @@ global {
 			matrix busDataMatrix <- matrix(csv_file("../includes/gis/bus_network/bus_lines_data.csv",true));
 			ask BusLine {
 				int n_vehicles <- DEFAULT_NUMBER_BUS;
+				int n_large_vehicles <- 0;
 				if busDataMatrix index_of line_name != nil {
-					line_com_speed <- float(busDataMatrix[7, int((busDataMatrix index_of line_name).y)]) #km/#h;
+					int yindex <- int((busDataMatrix index_of line_name).y);
+					n_vehicles <- int(busDataMatrix[1, yindex]);
+					n_large_vehicles <- int(busDataMatrix[8, yindex]);
+					line_com_speed <- float(busDataMatrix[7, yindex]) #km/#h;
+					line_interval_time_m <- float(busDataMatrix[4, yindex]) #minute;
 				}
 				do create_vehicles (int(n_vehicles/2), DIRECTION_OUTGOING);
 				do create_vehicles (int(n_vehicles/2), DIRECTION_RETURN);
+				ask n_large_vehicles among BusVehicle where (each.v_line = self) {
+					v_capacity <- BUS_LARGE_CAPACITY;
+				}
 			}	
 			ask BusLine - (BusLine inside city_area) {
 				sub_urban_busses <<+ BusVehicle where (each.v_line = self);
@@ -200,22 +208,37 @@ global {
 					do add_stop(DIRECTION_RETURN, end_ts, 0, txretpoints);
 					do add_stop(DIRECTION_RETURN, start_ts, 1, txretpoints);
 					
-					ask BusStop where (each distance_to self.line_outgoing_shape <= STOP_NEIGHBORING_DISTANCE) {
-						stop_connected_taxi_lines <+ (myself::DIRECTION_OUTGOING)::txoutpoints closest_to self;
-						myself.tl_connected_stops_outgoing <+ MStop(self);
+					point pp <- first(line_outgoing_stops);
+					list<MStop> stops_outgoing <- 
+								BusStop where (each distance_to (txoutpoints closest_to each) <= STOP_NEIGHBORING_DISTANCE) +
+								BRTStop where (each distance_to (txoutpoints closest_to each) <= STOP_NEIGHBORING_DISTANCE);
+					
+					stops_outgoing <- stops_outgoing sort_by (pp = txoutpoints closest_to each ?
+										0.0 : path_between(line_outgoing_graph, pp, txoutpoints closest_to each).shape.perimeter);
+					
+					map<MStop,point> outstops <- [];
+					loop mstop over: stops_outgoing {
+						outstops <+ mstop::txoutpoints closest_to mstop;//pp;
+						mstop.stop_connected_taxi_lines <+ (self::DIRECTION_OUTGOING);//::pp;
 					}
-					ask BRTStop where (each distance_to self.line_outgoing_shape <= STOP_NEIGHBORING_DISTANCE) {
-						stop_connected_taxi_lines <+ (myself::DIRECTION_OUTGOING)::txoutpoints closest_to self;
-						myself.tl_connected_stops_outgoing <+ MStop(self);
+					line_outgoing_stops <- [line_outgoing_stops.keys[0]::line_outgoing_stops.values[0]] + outstops +
+										   [line_outgoing_stops.keys[1]::line_outgoing_stops.values[1]];
+					//########################//
+					pp <- first(line_return_stops);
+					list<MStop> stops_return <- 
+								BusStop where (each distance_to (txretpoints closest_to each) <= STOP_NEIGHBORING_DISTANCE) +
+								BRTStop where (each distance_to (txretpoints closest_to each) <= STOP_NEIGHBORING_DISTANCE);
+					
+					stops_return <- stops_return sort_by (pp = txretpoints closest_to each ?
+										0.0 : path_between(line_outgoing_graph, pp, txretpoints closest_to each).shape.perimeter);
+					
+					map<MStop,point> retstops <- [];
+					loop mstop over: stops_return {
+						retstops <+ mstop::txretpoints closest_to mstop;//pp;
+						mstop.stop_connected_taxi_lines <+ (self::DIRECTION_RETURN);//::pp;
 					}
-					ask BusStop where (each distance_to self.line_return_shape <= STOP_NEIGHBORING_DISTANCE) {
-						stop_connected_taxi_lines <+ (myself::DIRECTION_RETURN)::txretpoints closest_to self;
-						myself.tl_connected_stops_return <+ MStop(self);
-					}
-					ask BRTStop where (each distance_to self.line_return_shape <= STOP_NEIGHBORING_DISTANCE) {
-						stop_connected_taxi_lines <+ (myself::DIRECTION_RETURN)::txretpoints closest_to self;
-						myself.tl_connected_stops_return <+ MStop(self);
-					}
+					line_return_stops <- [line_return_stops.keys[0]::line_return_stops.values[0]] + retstops +
+										 [line_return_stops.keys[1]::line_return_stops.values[1]];
 				}
 			}
 					
@@ -224,12 +247,6 @@ global {
 				int n_vehicles <- DEFAULT_NUMBER_TAXI;
 				do create_vehicles (int(n_vehicles/2), DIRECTION_OUTGOING);
 				do create_vehicles (int(n_vehicles/2), DIRECTION_RETURN);
-				
-				// organize connected stops
-				point pp <- first(line_outgoing_stops);
-				tl_connected_stops_outgoing <- tl_connected_stops_outgoing sort_by (each distance_to pp);
-				pp <- first(line_return_stops);
-				tl_connected_stops_return <- tl_connected_stops_return sort_by (each distance_to pp);
 			}
 			ask dummy_geom { do die; }
 		}
@@ -256,38 +273,45 @@ global {
 		/**************************************************************************************************************************/
 		//*
 		write "Creating population ...";
-		matrix<int> ODMatrix <- matrix<int>(csv_file("../includes/mobility/Bus_OD_Matrix.csv",false));
-		loop i from: 0 to: ODMatrix.rows -1 {
-			PDUZone o_zone <- PDUZone first_with (each.zone_code = i+1);
-			list<MStop> obstops <- BusStop where (each.stop_zone = o_zone);
-			if !empty(obstops) {
-				loop j from: 0 to: ODMatrix.columns -1{
-					PDUZone d_zone <- PDUZone first_with (each.zone_code = j+1);
-					list<MStop> dbstops <- BusStop where (each.stop_zone = d_zone);
-					if !empty(dbstops) {
-						create Individual number: ODMatrix[j,i]{
-							ind_id <- int(self);
-							ind_origin_zone <- o_zone;
-							ind_destin_zone <- d_zone;
-							ind_origin_stop <- one_of(obstops);
-							// distance between origin and destination must be greater than the neighboring distance, or take a walk !
-							// prevent very short trips (<= STOP_NEIGHBORING_DISTANCE);
-							ind_destin_stop <- one_of(dbstops where (each distance_to ind_origin_stop > STOP_NEIGHBORING_DISTANCE));
-							if ind_destin_stop = nil {
-								ind_destin_stop <- last(dbstops sort_by (each distance_to self));
-							}
-						}
-					}
-				}
-			}	
+		matrix popMatrix <- matrix(csv_file("../includes/population/populations_5000.csv",true));
+		loop i from: 0 to: popMatrix.rows -1 {
+			create Individual {
+				ind_id <- int(popMatrix[0,i]);
+				ind_origin_zone <- PDUZone first_with (each.zone_code = int(popMatrix[1,i]));
+				ind_destin_zone <- PDUZone first_with (each.zone_code = int(popMatrix[2,i]));
+				ind_origin_stop <- MStop first_with (each.stop_id = int(popMatrix[3,i]));
+				ind_destin_stop <- MStop first_with (each.stop_id = int(popMatrix[4,i]));					
+			}
 		}
-		ask 98350 among Individual {
-			do die;
+		
+		write "Creating trips ...";
+		matrix tripMatrix <- matrix(csv_file("../includes/population/trips_5000.csv",true));
+		loop i from: 0 to: popMatrix.rows -1 {
+			create MTrip returns: mytrip {
+				self.trip_id <- int(tripMatrix[0,i]);
+				self.trip_start_stop <- MStop first_with (each.stop_id = int(tripMatrix[1,i]));
+				self.trip_line <- MLine first_with (each.line_name = tripMatrix[2,i]);
+				self.trip_end_stop <- MStop first_with (each.stop_id = int(tripMatrix[3,i]));
+				self.trip_line_direction <- int(tripMatrix[4,i]);
+				self.trip_ride_distance <- int(tripMatrix[5,i]);
+			}
 		}
-		ask Individual {
-			//TODO remove towards a pre-code
-			do find_trip_options;
+		
+		write "Creating trip options...";
+		matrix popTripMatrix <- matrix(csv_file("../includes/population/trip_options_5000.csv",true));
+		int id_0 <- -1;
+		int id_x;
+		MTrip mtp;
+		Individual indiv_x;
+		loop i from: 0 to: popTripMatrix.rows -1 {
+			id_x <-  int(popTripMatrix[0,i]);
+			if id_x != id_0 {
+				id_0 <- id_x;
+				indiv_x <- Individual first_with (each.ind_id = id_x);
+			}
+			indiv_x.ind_trip_options <+ MTrip first_with (each.trip_id = int(popTripMatrix[1,i]))::int(popTripMatrix[2,i]);
 		}
+
 		write "Total population: " + length(Individual);
 		//*/
 		write "--+-- END OF INIT --+--" color:#green;		
@@ -350,7 +374,7 @@ experiment MarraSIM type: gui {
 	
 	output {
 				 
-		/*display Marrakesh type: 3d background: #whitesmoke toolbar:false {
+		display Marrakesh type: 3d background: #whitesmoke toolbar:false {
 			camera 'default' location: {76609.6582,72520.6097,11625.0305} target: {76609.6582,72520.4068,0.0};
 			
 			overlay position: {10#px,10#px} size: {100#px,40#px} background: #gray{
@@ -367,6 +391,6 @@ experiment MarraSIM type: gui {
 			species BusVehicle;
 			species TaxiVehicle;
 			species BRTVehicle;
-		}*/
+		}
 	}
 }

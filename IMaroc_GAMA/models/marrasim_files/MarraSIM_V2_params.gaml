@@ -26,7 +26,7 @@ global {
 	float BUS_SUBURBAN_SPEED <- 60#km/#hour;
 	
 	// the minimum wait time at bus stops
-	float MIN_WAIT_TIME_STOP <- 120#second;
+	float MIN_WAIT_TIME_STOP <- 5#second;
 	
 	// simulation starts at 06:00 morning
 	float SIM_START_HOUR <- 6#hour;

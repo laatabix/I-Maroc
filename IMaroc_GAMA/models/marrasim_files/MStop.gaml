@@ -59,13 +59,14 @@ species MStop schedules: [] parallel: true {
 	// list of line/direction that pass by the stop
 	list<pair<MLine,int>> stop_lines <- [];
 	// for each stop, the taxi lines (+direction) that an Individual can take + closest line on the taxiline to the stop
-	map<pair<TaxiLine,int>,point> stop_connected_taxi_lines <- [];
+	//map<pair<TaxiLine,int>,point> stop_connected_taxi_lines <- [];
+	list<pair<TaxiLine,int>> stop_connected_taxi_lines <- [];
 }	
 
 species BusStop parent: MStop{
 	geometry shape <- circle(40#meter);
 	aspect default {
-		draw circle(40#meter) color: #gamablue;
+		draw circle(40#meter) color: #darkred;
 		draw circle(20#meter) color: #white;
 		
 	}
@@ -74,7 +75,7 @@ species BusStop parent: MStop{
 species BRTStop parent: MStop {
 	geometry shape <- circle(40#meter);
 	aspect default {
-		draw circle(40#meter) color: #darkred;
+		draw circle(40#meter) color: #gamablue;
 		draw circle(20#meter) color: #white;
 	}
 }
@@ -82,7 +83,7 @@ species BRTStop parent: MStop {
 species TaxiStop parent: MStop{
 	geometry shape <- circle(40#meter);
 	aspect default {
-		draw circle(40#meter) color: #darkgreen;
+		draw circle(40#meter) color: #darkorange;
 		draw circle(20#meter) color: #white;
 	}
 }
