@@ -17,8 +17,8 @@ global {
 	int LINE_TYPE_BRT <- 22;
 	int LINE_TYPE_TAXI <- 23;
 	
-	int DEFAULT_NUMBER_BUS <- 2;
-	int DEFAULT_NUMBER_BRT <- 4;
+	int DEFAULT_NUMBER_BUS <- 4;
+	int DEFAULT_NUMBER_BRT <- 2;
 	int DEFAULT_NUMBER_TAXI <- 10;
 	
 	float DEFAULT_BUS_INTERVAL_TIME <- 20#minute;
@@ -59,6 +59,9 @@ species MLine schedules: [] parallel: true {
 				create BusVehicle {
 					do init_vehicle(myself, direction);
 					v_stop_wait_time <- (myself.line_interval_time_m * i);
+					if traffic_on {
+						v_speed <- myself.line_com_speed;
+					}
 				}
 			}
 		} else if self.line_type = LINE_TYPE_BRT {
@@ -139,6 +142,12 @@ species BusLine parent: MLine {
 	aspect default {
 		draw (shape+10#meter) color: #gamablue;
 		draw (shape+5#meter) color: #white;
+		loop ms over: line_outgoing_stops.values{
+			draw square(30#meter) color:#red at: ms;
+		}
+		loop ms over: line_return_stops.values{
+			draw square(30#meter) color:#yellow at: ms;
+		}
 	}
 }
 
@@ -165,32 +174,6 @@ species TaxiLine parent: MLine {
 		draw (shape+10#meter) color: #darkgreen;
 		draw (shape+5#meter) color: #white;
 	}
-	
-	/*int can_link_stops (MStop origin_stop, MStop destin_stop) {
-		try {
-			point arrival_stop <- last(line_outgoing_stops);
-			//point ostop <- origin_stop.stop_connected_taxi_lines at (self::DIRECTION_OUTGOING);
-			point ostop <- origin_stop.stop_connected_taxi_lines at (self::DIRECTION_OUTGOING);
-			point dstop <- destin_stop.stop_connected_taxi_lines at (self::DIRECTION_OUTGOING);
-			float o_dis <- path_between(line_outgoing_graph, ostop, arrival_stop).shape.perimeter;
-			float d_dis <- path_between(line_outgoing_graph, dstop, arrival_stop).shape.perimeter;
-			if d_dis < o_dis {
-				return DIRECTION_OUTGOING;
-			} else {
-				arrival_stop <- last(line_return_stops);
-				ostop <- origin_stop.stop_connected_taxi_lines at (self::DIRECTION_RETURN);
-				dstop <- destin_stop.stop_connected_taxi_lines at (self::DIRECTION_RETURN);
-				o_dis <- path_between(line_return_graph, ostop, arrival_stop).shape.perimeter;
-				d_dis <- path_between(line_return_graph, dstop, arrival_stop).shape.perimeter;
-				if d_dis < o_dis {
-					return DIRECTION_RETURN;
-				}
-			}
-			return -1;
-		} catch {
-			return -1;	
-		}
-	}*/		
 }
 
 /*** end of species definition ***/

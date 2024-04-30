@@ -20,7 +20,8 @@ global {
 	int BRT_CAPACITY <- 75;
 	int TAXI_CAPACITY <- 6;
 	
-	// list of vehicles of suburban lines
+	// list of vehicles of urban/suburban lines
+	list<BusVehicle> urban_busses <- [];
 	list<BusVehicle> sub_urban_busses <- [];
 	
 	// update speed of suburban buslines whenever they in/out of the city
@@ -30,7 +31,7 @@ global {
 			v_in_city <- false;
 		}
 		ask sub_urban_busses overlapping city_area {
-			v_speed <- TRAFFIC_ON ? v_line.line_com_speed : BUS_URBAN_SPEED;
+			v_speed <- traffic_on ? v_line.line_com_speed : BUS_URBAN_SPEED;
 			v_in_city <- true;
 		}
 	}
@@ -111,9 +112,27 @@ species MVehicle skills: [moving] {
 						ind_times <+ [int(time)]; // starting waiting time for the second trip
 						transfers <- transfers + 1;
 					}
-					
 					myself.v_passengers >- self;					
-					myself.v_stop_wait_time <- myself.v_stop_wait_time + V_TIME_DROP_IND;					
+					myself.v_stop_wait_time <- myself.v_stop_wait_time + V_TIME_DROP_IND;
+					
+					/****************************************/	
+					/**************** STATS ****************/
+					list<int> itimes <- last(ind_times);
+					if ind_current_trip.trip_line.line_type = LINE_TYPE_BUS {
+						number_of_completed_bus_trips <- number_of_completed_bus_trips + 1;
+						wtimes_completed_bus_trips <+ itimes[1] - itimes[0];
+						triptimes_completed_bus_trips <+ itimes[2] - itimes[1];
+					} else if ind_current_trip.trip_line.line_type = LINE_TYPE_BRT {
+						number_of_completed_brt_trips <- number_of_completed_brt_trips + 1;
+						wtimes_completed_brt_trips <+ itimes[1] - itimes[0];
+						triptimes_completed_brt_trips <+ itimes[2] - itimes[1];
+					} else {
+						number_of_completed_taxi_trips <- number_of_completed_taxi_trips + 1;
+						wtimes_completed_taxi_trips <+ itimes[1] - itimes[0];
+						triptimes_completed_taxi_trips <+ itimes[2] - itimes[1];
+					}
+					/****************************************/	
+					/***************************************/					
 				}
 				if (droppers + transfers) > 0 {
 					write world.formatted_time() + v_line.line_name  + ' (' + v_current_direction + ') is dropping '
@@ -191,12 +210,9 @@ species MVehicle skills: [moving] {
 }
 
 species BusVehicle parent: MVehicle {
+	float v_speed <- BUS_URBAN_SPEED;
 	image_file v_icon <- image_file("../../includes/img/bus.png");
 	geometry shape <- envelope(v_icon);
-
-	init {
-		v_speed <- BUS_URBAN_SPEED;
-	}
 	
 	aspect default {
 		draw v_icon size: {120#meter,60#meter} rotate: heading;
@@ -204,13 +220,10 @@ species BusVehicle parent: MVehicle {
 }
 
 species BRTVehicle parent: MVehicle {
+	float v_speed <- BRT_SPEED;
+	int v_capacity <- BRT_CAPACITY;
 	image_file v_icon <- image_file("../../includes/img/BRT.png");
 	geometry shape <- envelope(v_icon);
-	
-	init {
-		v_capacity <- BRT_CAPACITY;
-		v_speed <- BRT_SPEED;
-	}
 	
 	aspect default {
 		draw v_icon size: {120#meter,60#meter} rotate: heading;
@@ -218,13 +231,11 @@ species BRTVehicle parent: MVehicle {
 }	
 
 species TaxiVehicle parent: MVehicle {
+	float v_speed <- TAXI_SPEED;
+	int v_capacity <- TAXI_CAPACITY;
+	
 	image_file v_icon <- image_file("../../includes/img/taxi.png");
 	geometry shape <- envelope(v_icon);
-	
-	init {
-		v_capacity <- TAXI_CAPACITY;
-		v_speed <- TAXI_SPEED;
-	}
 	
 	aspect default {
 		draw v_icon size: {100#meter,50#meter} rotate: heading;

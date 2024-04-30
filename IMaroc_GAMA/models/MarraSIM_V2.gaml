@@ -36,8 +36,16 @@ global {
 	list<float> hourly_affluence <- [0.000,0.000,0.000,0.000,0.000,0.000,0.05,0.050,0.100,0.100,0.050,0.050, // [00:00 -> 11:00]
 								0.100,0.100,0.050,0.050,0.050,0.050,0.100,0.050,0.025,0.0125,0.0125,0.000];// [12:00 ->  23:00]
 	
+	/****************************************/	
+	/**************** STATS ****************/
+	list<list<int>> number_of_completed_trips <- [[],[],[]];
+	list<list<int>> mean_wait_time_completed_trips <- [[],[],[]];
+	list<list<int>> mean_trip_time_completed_trips <- [[],[],[]];
+	/****************************************/	
+	/***************************************/
+	
 	/*******************************/
-	/******** Initialization *******/
+	/******** Initialization ******/
 	/*****************************/
 	init {
 		write "--+-- START OF INIT --+--" color: #green;
@@ -53,7 +61,7 @@ global {
 		// create busses, bus stops
 		//*
 		write "Creating bus lines and bus stops ...";
-		create BusStop from: marrakesh_bus_stops with: [stop_id::int(get("stop_numbe")), stop_name::get("stop_name")]{
+		create BusStop from: marrakesh_bus_stops with: [stop_id::int(get("ID")), stop_name::get("NAME")]{
 			stop_zone <- first(PDUZone overlapping self);
 		}
 		if BUS_ON {
@@ -98,8 +106,7 @@ global {
 					}	
 				}
 			}
-			
-			// clean and prepare
+			// clean unused bus stops
 			ask BusStop - remove_duplicates(BusLine accumulate (each.line_outgoing_stops.keys + each.line_return_stops.keys)) {
 				do die;
 			}
@@ -127,6 +134,7 @@ global {
 			ask BusLine - (BusLine inside city_area) {
 				sub_urban_busses <<+ BusVehicle where (each.v_line = self);
 			}
+			urban_busses <<+ list(BusVehicle) - urban_busses;
 		}
 		/**************************************************************************************************************************/
 		/*** BRT LINES ***/
@@ -218,8 +226,8 @@ global {
 					
 					map<MStop,point> outstops <- [];
 					loop mstop over: stops_outgoing {
-						outstops <+ mstop::txoutpoints closest_to mstop;//pp;
-						mstop.stop_connected_taxi_lines <+ (self::DIRECTION_OUTGOING);//::pp;
+						outstops <+ mstop::txoutpoints closest_to mstop;
+						mstop.stop_connected_taxi_lines <+ (self::DIRECTION_OUTGOING);
 					}
 					line_outgoing_stops <- [line_outgoing_stops.keys[0]::line_outgoing_stops.values[0]] + outstops +
 										   [line_outgoing_stops.keys[1]::line_outgoing_stops.values[1]];
@@ -255,6 +263,7 @@ global {
 		/*** STOPS ***/
 		/**************************************************************************************************************************/
 		//*
+		// compute neighbors
 		ask BusStop {
 			stop_neighbors <- BusStop where (each.stop_zone != nil and each distance_to self <= STOP_NEIGHBORING_DISTANCE)
 									sort_by (each distance_to self)
@@ -279,26 +288,26 @@ global {
 				ind_id <- int(popMatrix[0,i]);
 				ind_origin_zone <- PDUZone first_with (each.zone_code = int(popMatrix[1,i]));
 				ind_destin_zone <- PDUZone first_with (each.zone_code = int(popMatrix[2,i]));
-				ind_origin_stop <- MStop first_with (each.stop_id = int(popMatrix[3,i]));
-				ind_destin_stop <- MStop first_with (each.stop_id = int(popMatrix[4,i]));					
+				ind_origin_stop <- BusStop first_with (each.stop_id = int(popMatrix[3,i]));
+				ind_destin_stop <- BusStop first_with (each.stop_id = int(popMatrix[4,i]));					
 			}
 		}
 		
 		write "Creating trips ...";
 		matrix tripMatrix <- matrix(csv_file("../includes/population/trips_5000.csv",true));
-		loop i from: 0 to: popMatrix.rows -1 {
+		loop i from: 0 to: tripMatrix.rows -1 {
 			create MTrip returns: mytrip {
 				self.trip_id <- int(tripMatrix[0,i]);
-				self.trip_start_stop <- MStop first_with (each.stop_id = int(tripMatrix[1,i]));
-				self.trip_line <- MLine first_with (each.line_name = tripMatrix[2,i]);
-				self.trip_end_stop <- MStop first_with (each.stop_id = int(tripMatrix[3,i]));
+				self.trip_start_stop <- (agents of_generic_species MStop) first_with (each.stop_id = int(tripMatrix[1,i]));
+				self.trip_line <- (agents of_generic_species MLine) first_with (each.line_name = tripMatrix[2,i]);
+				self.trip_end_stop <- (agents of_generic_species MStop) first_with (each.stop_id = int(tripMatrix[3,i]));
 				self.trip_line_direction <- int(tripMatrix[4,i]);
 				self.trip_ride_distance <- int(tripMatrix[5,i]);
 			}
 		}
 		
 		write "Creating trip options...";
-		matrix popTripMatrix <- matrix(csv_file("../includes/population/trip_options_5000.csv",true));
+		matrix popTripMatrix <- matrix(csv_file("../includes/population/pop_trips_5000.csv",true));
 		int id_0 <- -1;
 		int id_x;
 		MTrip mtp;
@@ -352,8 +361,30 @@ global {
 				ind_times <+ [int(time)]; // waiting time, first trip
 			}	
 		}
+		
+		number_of_completed_trips[0] <+ number_of_completed_bus_trips;
+		number_of_completed_trips[1] <+ number_of_completed_brt_trips;
+		number_of_completed_trips[2] <+ number_of_completed_taxi_trips;
+		
+		mean_wait_time_completed_trips[0] <+ mean(wtimes_completed_bus_trips)/60;
+		mean_wait_time_completed_trips[1] <+ mean(wtimes_completed_brt_trips)/60;
+		mean_wait_time_completed_trips[2] <+ mean(wtimes_completed_taxi_trips)/60;
+		
+		mean_trip_time_completed_trips[0] <+ mean(triptimes_completed_bus_trips)/60;
+		mean_trip_time_completed_trips[1] <+ mean(triptimes_completed_brt_trips)/60;
+		mean_trip_time_completed_trips[2] <+ mean(triptimes_completed_taxi_trips)/60;
 	}
 	
+	/*******************************************************************************************************************************/
+	/*******************************************************************************************************************************/
+	
+	// Whenever the traffic parameter is updated during simulation
+	action traffic_on_off {
+		write "Traffic congestion is " + (traffic_on ? "ON" : "OFF");
+		ask urban_busses {
+			v_speed <- traffic_on ? v_line.line_com_speed : BUS_URBAN_SPEED;
+		}
+	}
 	/*******************************************************************************************************************************/
 	/*******************************************************************************************************************************/
 }
@@ -371,6 +402,8 @@ experiment MarraSIM type: gui {
 	init {
 		minimum_cycle_duration <- 0.5;
 	}
+	
+	parameter "Congestion" category:"Traffic" var: traffic_on {ask world {do traffic_on_off;}}
 	
 	output {
 				 
@@ -391,6 +424,27 @@ experiment MarraSIM type: gui {
 			species BusVehicle;
 			species TaxiVehicle;
 			species BRTVehicle;
+		}
+		
+		display Mobility type: java2D background: #whitesmoke {
+			chart "Number of Completed Trips" type: series y_tick_line_visible: true x_tick_line_visible: false
+				background: #whitesmoke color: #black size: {1,0.33} position: {0,0} x_label: "Time" {
+				data "BUS" color: #gamablue value: number_of_completed_trips[0] marker_shape: marker_empty;
+				data "BRT" color: #darkred value: number_of_completed_trips[1] marker_shape: marker_empty;
+				data "TAXI" color: #darkorange value: number_of_completed_trips[2] marker_shape: marker_empty;
+			}
+			chart "Mean Wait Time of Completed Trips" type: series y_tick_line_visible: true x_tick_line_visible: false
+				background: #whitesmoke color: #black size: {1,0.33} position: {0,0.34} x_label: "Time" {
+				data "BUS" color: #gamablue value: mean_wait_time_completed_trips[0] marker_shape: marker_empty;
+				data "BRT" color: #darkred value: mean_wait_time_completed_trips[1] marker_shape: marker_empty;
+				data "TAXI" color: #darkorange value: mean_wait_time_completed_trips[2] marker_shape: marker_empty;
+			}
+			chart "Mean Trip Time of Completed Trips" type: series y_tick_line_visible: true x_tick_line_visible: false
+				background: #whitesmoke color: #black size: {1,0.33} position: {0,0.67} x_label: "Time" {
+				data "BUS" color: #gamablue value: mean_trip_time_completed_trips[0] marker_shape: marker_empty;
+				data "BRT" color: #darkred value: mean_trip_time_completed_trips[1] marker_shape: marker_empty;
+				data "TAXI" color: #darkorange value: mean_trip_time_completed_trips[2] marker_shape: marker_empty;
+			}	
 		}
 	}
 }

@@ -11,7 +11,7 @@ global {
 	bool BUS_ON <- true;
 	bool BRT_ON <- true;
 	bool TAXI_ON <- true;
-	bool TRAFFIC_ON <- false;
+	bool traffic_on <- false;
 	
 	int DIRECTION_OUTGOING <- 1;
 	int DIRECTION_RETURN <- 2;
@@ -32,5 +32,21 @@ global {
 	float SIM_START_HOUR <- 6#hour;
 	
 	font AFONT0 <- font("Calibri", 16, #bold);
+	
+	/****************************************/	
+	/**************** STATS ****************/
+	int number_of_completed_bus_trips <- 0;
+	int number_of_completed_brt_trips <- 0;
+	int number_of_completed_taxi_trips <- 0;
+	
+	list<int> wtimes_completed_bus_trips <- [];
+	list<int> wtimes_completed_brt_trips <- [];
+	list<int> wtimes_completed_taxi_trips <- [];
+	
+	list<int> triptimes_completed_bus_trips <- [];
+	list<int> triptimes_completed_brt_trips <- [];
+	list<int> triptimes_completed_taxi_trips <- [];
+	/****************************************/	
+	/***************************************/
 }
 

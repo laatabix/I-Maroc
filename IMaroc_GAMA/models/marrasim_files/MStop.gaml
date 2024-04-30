@@ -66,16 +66,15 @@ species MStop schedules: [] parallel: true {
 species BusStop parent: MStop{
 	geometry shape <- circle(40#meter);
 	aspect default {
-		draw circle(40#meter) color: #darkred;
-		draw circle(20#meter) color: #white;
-		
+		draw circle(40#meter) color: #gamablue;
+		draw circle(20#meter) color: #white;		
 	}
 }
 
 species BRTStop parent: MStop {
 	geometry shape <- circle(40#meter);
 	aspect default {
-		draw circle(40#meter) color: #gamablue;
+		draw circle(40#meter) color: #darkred;
 		draw circle(20#meter) color: #white;
 	}
 }
