@@ -3,7 +3,7 @@
 * Description: defines the Individual species and its related constantes, variables, and methods.
 * 				An Individual agent represents one person that travel using the public network between
 * 				an origin and a destination.
-* Authors: Laatabi, Benchra
+* Authors: Laatabi
 * For the i-Maroc project. 
 */
 
@@ -12,6 +12,9 @@ model Individual
 import "MTrip.gaml"
 
 global {
+	
+	// time to wait for single-trips before taking a double-trip when transfer is off
+	int IND_WAITING_TIME_FOR_SINGLE_TRIPS <- int(30#minute);
 	
 }
 

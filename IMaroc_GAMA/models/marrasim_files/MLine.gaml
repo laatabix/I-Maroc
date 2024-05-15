@@ -2,7 +2,7 @@
 * Name: MLine
 * Description: defines the MLine species and its related constantes, variables, and methods.
 * 				A MLine agent represents an outgoing-return path of a bus.
-* Authors: Laatabi, Benchra
+* Authors: Laatabi
 * For the i-Maroc project.
 */
 
@@ -18,8 +18,8 @@ global {
 	int LINE_TYPE_TAXI <- 23;
 	
 	int DEFAULT_NUMBER_BUS <- 4;
-	int DEFAULT_NUMBER_BRT <- 2;
-	int DEFAULT_NUMBER_TAXI <- 10;
+	int DEFAULT_NUMBER_BRT <- 4;
+	int DEFAULT_NUMBER_TAXI <- 6;
 	
 	float DEFAULT_BUS_INTERVAL_TIME <- 20#minute;
 	float DEFAULT_TAXI_INTERVAL_TIME <- 10#minute;
@@ -41,7 +41,13 @@ species MLine schedules: [] parallel: true {
 	geometry line_return_shape;
 	graph line_outgoing_graph;	
 	graph line_return_graph;
-		
+	list<int> line_outgoing_dists <- [];
+	list<int> line_return_dists <- [];
+	// contains unique locations, line_outgoing_stops may contain duplicate values
+	// (for stops having same location in case of taxi for example)
+	list<point> line_outgoing_locations <- [];
+	list<point> line_return_locations <- [];
+	
 	//---------------------------------------//
 	action init_line (string nm, geometry out, geometry ret) {
 		line_name <- nm;
@@ -88,7 +94,12 @@ species MLine schedules: [] parallel: true {
 				write "Error in order of stops!" color: #red;
 			}
 			self.line_outgoing_stops <+ mstop::mypoints closest_to mstop;
-			if !(mstop.stop_lines contains (self::DIRECTION_OUTGOING)) {
+			if stop_order > 0 {
+				line_outgoing_dists<+ line_outgoing_stops.values[stop_order] = line_outgoing_stops.values[stop_order-1] ?
+										0 : int(path_between(line_outgoing_graph, line_outgoing_stops.values[stop_order],
+											line_outgoing_stops.values[stop_order-1]).shape.perimeter);
+			}			
+			if !(mstop.stop_lines contains (self::DIRECTION_OUTGOING)) { // add once only
 				mstop.stop_lines <+ self::DIRECTION_OUTGOING;
 			}
 		} else {
@@ -96,6 +107,11 @@ species MLine schedules: [] parallel: true {
 				write "Error in order of stops!" color: #red;
 			}
 			self.line_return_stops <+ mstop::mypoints closest_to mstop;
+			if stop_order > 0 {
+				line_return_dists<+ line_return_stops.values[stop_order] = line_return_stops.values[stop_order-1] ?
+										0 : int(path_between(line_return_graph, line_return_stops.values[stop_order],
+											line_return_stops.values[stop_order-1]).shape.perimeter);
+			}
 			if !(mstop.stop_lines contains (self::DIRECTION_RETURN)) {
 				mstop.stop_lines <+ self::DIRECTION_RETURN;
 			}
@@ -122,13 +138,13 @@ species MLine schedules: [] parallel: true {
 	
 	//---------------------------------------//
 	// return the next stop given the direction and another stop
-	MStop next_bs (int dir, MStop ss) {
+	point next_stop_location (int dir, point pp) {
 		if dir = DIRECTION_OUTGOING {
-			int indx <- line_outgoing_stops.keys index_of ss;
-			return indx < length(line_outgoing_stops.keys)-1 ? line_outgoing_stops.keys[indx+1] : nil;
+			int indx <- line_outgoing_locations index_of pp;
+			return indx < length(line_outgoing_locations)-1 ? line_outgoing_locations[indx+1] : nil;
 		} else {
-			int indx <- line_return_stops.keys index_of ss;
-			return indx < length(line_return_stops.keys)-1 ? line_return_stops.keys[indx+1] : nil;
+			int indx <- line_return_locations index_of pp;
+			return indx < length(line_return_locations)-1 ? line_return_locations[indx+1] : nil;
 		}
 	}	
 }
@@ -142,12 +158,6 @@ species BusLine parent: MLine {
 	aspect default {
 		draw (shape+10#meter) color: #gamablue;
 		draw (shape+5#meter) color: #white;
-		loop ms over: line_outgoing_stops.values{
-			draw square(30#meter) color:#red at: ms;
-		}
-		loop ms over: line_return_stops.values{
-			draw square(30#meter) color:#yellow at: ms;
-		}
 	}
 }
 

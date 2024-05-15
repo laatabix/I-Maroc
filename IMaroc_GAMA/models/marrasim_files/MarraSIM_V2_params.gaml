@@ -1,29 +1,40 @@
 /**
 * Name: Params
 * Description: this file stores general and main parameters.
-* Authors: Laatabi, Benchra
+* Authors: Laatabi
 * For the i-Maroc project. 
 */
 
 model Params
 
 global {
+	
+	/********* Simulation *********/
+	float sim_id; // a unique simulation id for data storage
+	// whether to save simulation data (to /outputs) or not
+	bool save_data_on <- false;
+	
 	bool BUS_ON <- true;
 	bool BRT_ON <- true;
 	bool TAXI_ON <- true;
+	
 	bool traffic_on <- false;
+	bool transfer_on <- false;
+	bool time_tables_on <- false;
 	
 	int DIRECTION_OUTGOING <- 1;
 	int DIRECTION_RETURN <- 2;
 	
-	// speed of busses in the urban area
-	float BUS_URBAN_SPEED <- 25#km/#hour;
-	// speed of BRTs and Taxis
-	float BRT_SPEED <- 40#km/#hour;
-	float TAXI_SPEED <- 30#km/#hour;
-	
-	// speed of busses in the suburban area
+	// speed of busses in the suburban/urban area
 	float BUS_SUBURBAN_SPEED <- 60#km/#hour;
+	float BUS_URBAN_SPEED <- 40#km/#hour;
+	
+	// speed of BRTs and Taxis
+	float BRT_SPEED <- 50#km/#hour;
+	float TAXI_FREE_SPEED <- 50#km/#hour;
+	float TAXI_TRAFFIC_SPEED <- 30#km/#hour;
+	
+
 	
 	// the minimum wait time at bus stops
 	float MIN_WAIT_TIME_STOP <- 5#second;

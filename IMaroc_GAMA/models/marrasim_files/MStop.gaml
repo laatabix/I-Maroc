@@ -2,7 +2,7 @@
 * Name: MStop
 * Description: defines the MStop species and its related constantes, variables, and methods.
 * 				A MStop agent represents a location where buses can take or drop off people.
-* Authors: Laatabi, Benchra
+* Authors: Laatabi
 * For the i-Maroc project.
 */
 
@@ -22,10 +22,16 @@ global {
 		list<MStop> lisa <- [];
 		bool sstop <- false;
 		loop elem1 over: li1 {
-			if !empty(elem1.stop_neighbors inter li2) {
-				lisa <<+ elem1.stop_neighbors;
+			list<MStop> inters <- elem1.stop_neighbors inter li2;
+			if !empty(inters) {
+				if length(inters) = 1 and first(inters) = elem1{
+					lisa <<+ elem1.stop_neighbors;
+				} else {
+					lisa <<+ elem1.stop_neighbors inter (li2 closest_to elem1).stop_neighbors;
+				}
 				sstop <- true;
-			} else if sstop {
+			}
+			if sstop {
 				break;
 			}
 		}
@@ -55,11 +61,12 @@ species MStop schedules: [] parallel: true {
 	PDUZone stop_zone;
 	
 	list<Individual> stop_waiting_people <- [];
+	list<Individual> stop_transited_people <- [];
+	list<Individual> stop_arrived_people <- [];
 	list<MStop> stop_neighbors <- [];
 	// list of line/direction that pass by the stop
 	list<pair<MLine,int>> stop_lines <- [];
 	// for each stop, the taxi lines (+direction) that an Individual can take + closest line on the taxiline to the stop
-	//map<pair<TaxiLine,int>,point> stop_connected_taxi_lines <- [];
 	list<pair<TaxiLine,int>> stop_connected_taxi_lines <- [];
 }	
 

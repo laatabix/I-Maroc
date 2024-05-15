@@ -2,7 +2,7 @@
 * Name: Trip_Generator
 * Description: Trip_Generator allows to generate all possible travel options (trips) for the given population.
 * 				The result is stored into a file to be read and use by the main model.
-* Authors: Laatabi, Benchra
+* Authors: Laatabi
 * For the i-Maroc project. 
 */
 
@@ -41,8 +41,11 @@ global {
 		// create busses, bus stops
 		//*
 		write "Creating bus lines and bus stops ...";
-		create BusStop from: marrakesh_bus_stops with: [stop_id::int(get("stop_numbe")), stop_name::get("stop_name")]{
+		create BusStop from: marrakesh_bus_stops with: [stop_id::int(get("ID")), stop_name::get("NAME")]{
 			stop_zone <- first(PDUZone overlapping self);
+			if stop_zone = nil {
+				stop_zone <- PDUZone where (each distance_to self <= STOP_NEIGHBORING_DISTANCE) with_min_of (each distance_to self);
+			}
 		}
 		//*
 		create dummy_geom from: marrakesh_bus_lines with: [g_name::get("NAME"),g_direction::int(get("DIR"))];
@@ -99,7 +102,7 @@ global {
 		create BRTStop from: marrakesh_brt_stops with: [stop_id::int(get("ID")), stop_name::get("NAME")]{
 			stop_zone <- first(PDUZone overlapping self);
 			if stop_zone = nil {
-				stop_zone <- PDUZone closest_to self;
+				stop_zone <- PDUZone where (each distance_to self <= STOP_NEIGHBORING_DISTANCE) with_min_of (each distance_to self);
 			}
 		}
 		create dummy_geom from: marrakesh_brt_lines with: [g_id::int(get("ID")),g_name::get("NAME")];
@@ -139,77 +142,84 @@ global {
 		write "Creating Taxi lines and stations ...";
 		create TaxiStop from: marrakesh_taxi_stations with: [stop_id::int(get("ID")), stop_name::get("NAME")]{
 			stop_zone <- first(PDUZone overlapping self);
+			if stop_zone = nil {
+				stop_zone <- PDUZone where (each distance_to self <= STOP_NEIGHBORING_DISTANCE) with_min_of (each distance_to self);
+			}
 		}
 		create dummy_geom from: marrakesh_taxi_lines with:
-					[g_id::int(get("ID_TXLINE")),g_name::get("NAME"),g_direction::int(get("DIR")),
-						g_var1::int(get("ST_START")),g_var2::int(get("ST_END"))];
-		
-		loop tx_id over: remove_duplicates(dummy_geom collect (each.g_id)) {
-			dummy_geom txout <- dummy_geom first_with (each.g_id = tx_id and each.g_direction = DIRECTION_OUTGOING);
-			dummy_geom txret <- dummy_geom first_with (each.g_id = tx_id and each.g_direction = DIRECTION_RETURN);
+						[g_id::int(get("ID_TXLINE")),g_name::get("NAME"),g_direction::int(get("DIR")),
+							g_var1::int(get("ST_START")),g_var2::int(get("ST_END"))];
 			
-			list<point> txoutpoints <- points_on(txout,25#m);
-			list<point> txretpoints <- points_on(txret,25#m);
-			create TaxiLine {
-				line_id <- tx_id;
-				do init_line ("TX"+line_id, txout.shape, txret.shape);
+			loop tx_id over: remove_duplicates(dummy_geom collect (each.g_id)) {
+				dummy_geom txout <- dummy_geom first_with (each.g_id = tx_id and each.g_direction = DIRECTION_OUTGOING);
+				dummy_geom txret <- dummy_geom first_with (each.g_id = tx_id and each.g_direction = DIRECTION_RETURN);
 				
-				MStop start_ts <- TaxiStop first_with (each.stop_id = txout.g_var1);
-				MStop end_ts <- TaxiStop first_with (each.stop_id = txout.g_var2);
-				do add_stop(DIRECTION_OUTGOING, start_ts, 0, txoutpoints);
-				do add_stop(DIRECTION_OUTGOING, end_ts, 1, txoutpoints);
-				do add_stop(DIRECTION_RETURN, end_ts, 0, txretpoints);
-				do add_stop(DIRECTION_RETURN, start_ts, 1, txretpoints);
-				
-				point pp <- first(line_outgoing_stops);
-				list<MStop> stops_outgoing <- 
-							BusStop where (each distance_to (txoutpoints closest_to each) <= STOP_NEIGHBORING_DISTANCE) +
-							BRTStop where (each distance_to (txoutpoints closest_to each) <= STOP_NEIGHBORING_DISTANCE);
-				
-				stops_outgoing <- stops_outgoing sort_by (pp = txoutpoints closest_to each ?
-									0.0 : path_between(line_outgoing_graph, pp, txoutpoints closest_to each).shape.perimeter);
-				
-				map<MStop,point> outstops <- [];
-				loop mstop over: stops_outgoing {
-					outstops <+ mstop::txoutpoints closest_to mstop;//pp;
-					mstop.stop_connected_taxi_lines <+ (self::DIRECTION_OUTGOING);//::pp;
+				list<point> txoutpoints <- points_on(txout,50#m);
+				list<point> txretpoints <- points_on(txret,50#m);
+				create TaxiLine {
+					line_id <- tx_id;
+					do init_line ("TX"+line_id, txout.shape, txret.shape);
+					TaxiStop start_ts <- TaxiStop first_with (each.stop_id = txout.g_var1);
+					TaxiStop end_ts <- TaxiStop first_with (each.stop_id = txout.g_var2);
+					
+					point pp <- txoutpoints closest_to start_ts;
+					list<MStop> stops_outgoing <- [start_ts, end_ts] +
+								BusStop where (each distance_to (txoutpoints closest_to each) <= STOP_NEIGHBORING_DISTANCE) +
+								BRTStop where (each distance_to (txoutpoints closest_to each) <= STOP_NEIGHBORING_DISTANCE);
+					
+					stops_outgoing <- stops_outgoing sort_by (pp = txoutpoints closest_to each ?
+										0.0 : path_between(line_outgoing_graph, pp, txoutpoints closest_to each).shape.perimeter);
+					
+					loop mstop over: stops_outgoing {
+						line_outgoing_stops <+ mstop::txoutpoints closest_to mstop;
+						mstop.stop_connected_taxi_lines <+ (self::DIRECTION_OUTGOING);
+					}
+					line_outgoing_locations <- remove_duplicates(line_outgoing_stops.values);
+					loop i from: 1 to: length(line_outgoing_locations) - 1 {
+						line_outgoing_dists<+ line_outgoing_locations[i] = line_outgoing_locations[i-1] ?
+												0 : int(path_between(line_outgoing_graph, line_outgoing_locations[i],
+													line_outgoing_locations[i-1]).shape.perimeter);
+					}
+					//########################//
+					pp <- txretpoints closest_to end_ts;
+					list<MStop> stops_return <- [start_ts, end_ts] +
+								BusStop where (each distance_to (txretpoints closest_to each) <= STOP_NEIGHBORING_DISTANCE) +
+								BRTStop where (each distance_to (txretpoints closest_to each) <= STOP_NEIGHBORING_DISTANCE);
+					
+					stops_return <- stops_return sort_by (pp = txretpoints closest_to each ?
+										0.0 : path_between(line_return_graph, pp, txretpoints closest_to each).shape.perimeter);
+					
+					loop mstop over: stops_return {
+						line_return_stops <+ mstop::txretpoints closest_to mstop;
+						mstop.stop_connected_taxi_lines <+ (self::DIRECTION_RETURN);
+					}
+					line_return_locations <- remove_duplicates(line_return_stops.values);
+					loop i from: 1 to: length(line_return_locations) - 1 {
+						line_return_dists<+ line_return_locations[i] = line_return_locations[i-1] ?
+											0 : int(path_between(line_return_graph, line_return_locations[i],
+												line_return_locations[i-1]).shape.perimeter);
+					}
 				}
-				line_outgoing_stops <- [line_outgoing_stops.keys[0]::line_outgoing_stops.values[0]] + outstops +
-									   [line_outgoing_stops.keys[1]::line_outgoing_stops.values[1]];
-				//########################//
-				pp <- first(line_return_stops);
-				list<MStop> stops_return <- 
-							BusStop where (each distance_to (txretpoints closest_to each) <= STOP_NEIGHBORING_DISTANCE) +
-							BRTStop where (each distance_to (txretpoints closest_to each) <= STOP_NEIGHBORING_DISTANCE);
-				
-				stops_return <- stops_return sort_by (pp = txretpoints closest_to each ?
-									0.0 : path_between(line_outgoing_graph, pp, txretpoints closest_to each).shape.perimeter);
-				
-				map<MStop,point> retstops <- [];
-				loop mstop over: stops_return {
-					retstops <+ mstop::txretpoints closest_to mstop;//pp;
-					mstop.stop_connected_taxi_lines <+ (self::DIRECTION_RETURN);//::pp;
-				}
-				line_return_stops <- [line_return_stops.keys[0]::line_return_stops.values[0]] + retstops +
-									 [line_return_stops.keys[1]::line_return_stops.values[1]];
-			}	
-		}
-		ask dummy_geom { do die; }		
+			}
+			ask dummy_geom { do die; }		
 		/**************************************************************************************************************************/
 		/*** STOPS ***/
 		/**************************************************************************************************************************/
 		//*
-		ask BusStop {
+		// compute neighbors
+		ask BusStop where (each.stop_zone != nil){
 			stop_neighbors <- BusStop where (each.stop_zone != nil and each distance_to self <= STOP_NEIGHBORING_DISTANCE)
 									sort_by (each distance_to self)
 							+ BRTStop where (each.stop_zone != nil and each distance_to self <= STOP_NEIGHBORING_DISTANCE)
-									sort_by (each distance_to self);			
+									sort_by (each distance_to self);
+			stop_zone.zone_stops <+ self; 			
 		}
-		ask BRTStop {
+		ask BRTStop where (each.stop_zone != nil){
 			stop_neighbors <- BusStop where (each.stop_zone != nil and each distance_to self <= STOP_NEIGHBORING_DISTANCE)
 									sort_by (each distance_to self)
 							+ BRTStop where (each.stop_zone != nil and each distance_to self <= STOP_NEIGHBORING_DISTANCE)
-									sort_by (each distance_to self);			
+									sort_by (each distance_to self);
+			stop_zone.zone_stops <+ self; 		
 		}
 		//*/
 		/**************************************************************************************************************************/
@@ -233,7 +243,7 @@ global {
 							ind_origin_stop <- one_of(obstops);
 							// distance between origin and destination must be greater than the neighboring distance, or take a walk !
 							// prevent very short trips (<= STOP_NEIGHBORING_DISTANCE);
-							ind_destin_stop <- one_of(dbstops where (each distance_to ind_origin_stop > STOP_NEIGHBORING_DISTANCE));
+							ind_destin_stop <- one_of(obstops where (each distance_to ind_origin_stop > STOP_NEIGHBORING_DISTANCE));
 							if ind_destin_stop = nil {
 								ind_destin_stop <- last(dbstops sort_by (each distance_to self));
 							}
@@ -245,7 +255,7 @@ global {
 		write "Total population: " + length(Individual);
 		
 		write "Generating trip options ..";
-		list<Individual> individuals <- 5000 among Individual; //TODO number ?
+		list<Individual> individuals <- 1000 among Individual; //TODO number ?
 		
 		ask individuals {
 			// if another individual with the same origin and destination bus stops has already a planning, just copy it
