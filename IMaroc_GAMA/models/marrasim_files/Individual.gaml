@@ -43,6 +43,7 @@ species Individual parallel: true {
 	MTrip add_trip (MStop stop1, MStop stop2, MLine li, int dir) {
 		MTrip mtp <- MTrip first_with (each.trip_start_stop = stop1 and each.trip_end_stop = stop2 and
 										each.trip_line = li and each.trip_line_direction = dir);
+		
 		if mtp = nil {
 			create MTrip returns: mytrip {
 				self.trip_id <- int(self);
@@ -52,23 +53,22 @@ species Individual parallel: true {
 				self.trip_line_direction <- dir;
 				
 				graph mygraph <- li.line_outgoing_graph;
-				
-				/*if li.line_type = LINE_TYPE_TAXI {
-					if dir = DIRECTION_RETURN {
-						mygraph <- li.line_return_graph;
-					}
-					self.trip_ride_distance <- int(path_between(mygraph, stop1.stop_connected_taxi_lines at (TaxiLine(li)::dir),
-															stop2.stop_connected_taxi_lines at (TaxiLine(li)::dir)).shape.perimeter);
-				} else {*/
-					map<MStop,point> mystops <- li.line_outgoing_stops;
-					if dir = DIRECTION_RETURN {
-						mystops <- li.line_return_stops;
-						mygraph <- li.line_return_graph;
-					}
-					self.trip_ride_distance <- int(path_between(mygraph, mystops at stop1, mystops at stop2).shape.perimeter);
-				//}
+				map<MStop,point> mystops <- li.line_outgoing_stops;
+				if dir = DIRECTION_RETURN {
+					mystops <- li.line_return_stops;
+					mygraph <- li.line_return_graph;
+				}
+				self.trip_ride_distance <- int(path_between(mygraph, mystops at stop1, mystops at stop2).shape.perimeter);
 			}
-			return mytrip[0];
+			// a valid trio is at least 2 times the neighbouring distance 
+			if mytrip[0].trip_ride_distance <= 2 * STOP_NEIGHBORING_DISTANCE {
+				ask mytrip[0] {
+					do die;
+				}
+				return nil;
+			} else {
+				return mytrip[0];	
+			}
 		} else {
 			return mtp;
 		}
@@ -103,8 +103,11 @@ species Individual parallel: true {
 	        }
         	direc1 <- single_line.key.can_link_stops(stop1, stop2);
     		if direc1 != -1 {
-    			ind_trip_options <+ add_trip(stop1, stop2, single_line.key, direc1)::TRIP_SINGLE;
-    			single_lines <+ single_line;
+    			MTrip mtp <- add_trip(stop1, stop2, single_line.key, direc1);
+    			if mtp != nil {
+    				ind_trip_options <+ mtp::TRIP_SINGLE;
+    				single_lines <+ single_line;
+    			}
     		}
         }
         
@@ -118,15 +121,10 @@ species Individual parallel: true {
         														first_line.key.line_return_stops.keys;
         	if first_line.key.line_type = LINE_TYPE_TAXI {
         		stop1 <- ind_origin_stop;
-        		//mstops1 <- first_line.value = DIRECTION_OUTGOING ? TaxiLine(first_line.key).tl_connected_stops_outgoing :
-        			//									TaxiLine(first_line.key).tl_connected_stops_return;
-        		//mstops1 <- (copy_between(mstops1, (mstops1 index_of stop1)+1, length(mstops1)) - stop1.stop_neighbors);
         	} else {
-        		
         		stop1 <- mstops1 contains ind_origin_stop ? ind_origin_stop : mstops1 closest_to ind_origin_stop;
-        		// only stops that come after the considered stop and are in neighbors
-        		//mstops1 <- (copy_between(mstops1, (mstops1 index_of stop1)+1, length(mstops1)) - stop1.stop_neighbors);
            	}
+           	// only stops that come after the considered stop and are in neighbors
            	mstops1 <- (copy_between(mstops1, (mstops1 index_of stop1)+1, length(mstops1)) - stop1.stop_neighbors);
            	
             loop second_line over: (remove_duplicates(ind_destin_stop.stop_neighbors accumulate each.stop_lines) +
@@ -135,12 +133,8 @@ species Individual parallel: true {
 				mstops2 <- second_line.value = DIRECTION_OUTGOING ? second_line.key.line_outgoing_stops.keys :
             														second_line.key.line_return_stops.keys;
             	if second_line.key.line_type = LINE_TYPE_TAXI {
-        			//mstops2 <- second_line.value = DIRECTION_OUTGOING ? TaxiLine(second_line.key).tl_connected_stops_outgoing :
-        				//								TaxiLine(second_line.key).tl_connected_stops_return;
         			stop2 <- ind_destin_stop;
         		} else {
-        			//mstops2 <- second_line.value = DIRECTION_OUTGOING ? second_line.key.line_outgoing_stops.keys :
-            			//											second_line.key.line_return_stops.keys;
 	            	stop2 <- mstops2 contains ind_destin_stop ? ind_destin_stop : mstops2 closest_to ind_destin_stop;
 				}
 				mstops2 <- (copy_between(mstops2, 0, (mstops2 index_of stop2)+1) - stop2.stop_neighbors);
@@ -155,8 +149,14 @@ species Individual parallel: true {
 						direc1 <- first_line.key.can_link_stops(stop1, first(clos_stops));
 				 		direc2 <- second_line.key.can_link_stops(last(clos_stops), stop2);
 						if direc1 != -1 and direc2 != -1 {
-				 			ind_trip_options <+ add_trip(stop1, first(clos_stops), first_line.key, direc1)::TRIP_FIRST;
-				 			ind_trip_options <+ add_trip(last(clos_stops), stop2, second_line.key, direc2)::TRIP_SECOND;
+							MTrip mtp1 <- add_trip(stop1, first(clos_stops), first_line.key, direc1);
+							if mtp1 != nil {
+								MTrip mtp2 <- add_trip(last(clos_stops), stop2, second_line.key, direc2);
+								if mtp2 != nil {
+									ind_trip_options <+ mtp1::TRIP_FIRST;
+				 					ind_trip_options <+ mtp2::TRIP_SECOND;
+								}
+							}
 				 		}
 				 	}	
 				 }

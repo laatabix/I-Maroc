@@ -42,11 +42,32 @@ global {
 		if empty(li1) or empty(li2) {
 			return [];
 		}
-		MStop stop1 <- first(li1);
-		MStop stop2 <- li2 contains stop1 ? stop1 : li2 closest_to stop1;
-		if stop1 != stop2 {
-			stop1 <- li1 contains stop2 ? stop2 : li1 closest_to stop2;
+		
+		
+		
+		MStop stop1;// <- first(li1);
+		MStop stop2;//<- li2 contains stop1 ? stop1 : li2 closest_to stop1;
+		MStop clos;
+		float min_dist <- #max_float;
+		float ddst;
+		loop stp over: li1 {
+			if li2 contains stp {
+				clos <- stp;
+				ddst <- 0.0;
+			} else {
+				clos <- li2 closest_to stp;
+				ddst <- stp distance_to clos;
+			}
+			if ddst < min_dist {
+				min_dist <- ddst;
+				stop1 <- stp;
+				stop2 <- clos;
+			}
 		}
+		
+		/*if stop1 != stop2 {
+			stop1 <- li1 contains stop2 ? stop2 : li1 closest_to stop2;
+		}*/
 		return [stop1,stop2];
 	}
 }
@@ -70,7 +91,7 @@ species MStop schedules: [] parallel: true {
 	list<pair<TaxiLine,int>> stop_connected_taxi_lines <- [];
 }	
 
-species BusStop parent: MStop{
+species BusStop parent: MStop {
 	geometry shape <- circle(40#meter);
 	aspect default {
 		draw circle(40#meter) color: #gamablue;

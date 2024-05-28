@@ -41,8 +41,8 @@ global {
 		// create busses, bus stops
 		//*
 		write "Creating bus lines and bus stops ...";
-		create BusStop from: marrakesh_bus_stops with: [stop_id::int(get("ID")), stop_name::get("NAME")]{
-			stop_zone <- first(PDUZone overlapping self);
+		create BusStop from: marrakesh_bus_stops with: [stop_id::int(get("ID")), stop_name::get("NAME"),
+								stop_zone::PDUZone first_with(each.zone_code = int(get("pduzone_id")))]{
 			if stop_zone = nil {
 				stop_zone <- PDUZone where (each distance_to self <= STOP_NEIGHBORING_DISTANCE) with_min_of (each distance_to self);
 			}
@@ -65,8 +65,8 @@ global {
 				if current_bl = nil {
 					bsout <- (dummy_geom first_with (each.g_name = bus_line_name and each.g_direction = DIRECTION_OUTGOING));
 					bsret <- (dummy_geom first_with (each.g_name = bus_line_name and each.g_direction = DIRECTION_RETURN));
-					bsoutpoints <- points_on(bsout,25#m);
-					bsretpoints <- points_on(bsret,25#m);
+					bsoutpoints <- points_on(bsout,25#meter);
+					bsretpoints <- points_on(bsret,25#meter);
 					
 					create BusLine returns: my_busline {
 						do init_line (bus_line_name, bsout.shape, bsret.shape);
@@ -99,8 +99,8 @@ global {
 		/**************************************************************************************************************************/
 		//*
 		write "Creating BRT stops and lines ...";
-		create BRTStop from: marrakesh_brt_stops with: [stop_id::int(get("ID")), stop_name::get("NAME")]{
-			stop_zone <- first(PDUZone overlapping self);
+		create BRTStop from: marrakesh_brt_stops with: [stop_id::int(get("ID")), stop_name::get("NAME"),
+								stop_zone::PDUZone first_with(each.zone_code = int(get("pduzone_id")))]{
 			if stop_zone = nil {
 				stop_zone <- PDUZone where (each distance_to self <= STOP_NEIGHBORING_DISTANCE) with_min_of (each distance_to self);
 			}
@@ -140,8 +140,8 @@ global {
 		/**************************************************************************************************************************/
 		//*
 		write "Creating Taxi lines and stations ...";
-		create TaxiStop from: marrakesh_taxi_stations with: [stop_id::int(get("ID")), stop_name::get("NAME")]{
-			stop_zone <- first(PDUZone overlapping self);
+		create TaxiStop from: marrakesh_taxi_stations with: [stop_id::int(get("ID")), stop_name::get("NAME"),
+								stop_zone::PDUZone first_with(each.zone_code = int(get("pduzone_id")))]{
 			if stop_zone = nil {
 				stop_zone <- PDUZone where (each distance_to self <= STOP_NEIGHBORING_DISTANCE) with_min_of (each distance_to self);
 			}
@@ -221,6 +221,13 @@ global {
 									sort_by (each distance_to self);
 			stop_zone.zone_stops <+ self; 		
 		}
+		ask TaxiStop where (each.stop_zone != nil){
+			stop_neighbors <- BusStop where (each.stop_zone != nil and each distance_to self <= STOP_NEIGHBORING_DISTANCE)
+									sort_by (each distance_to self)
+							+ BRTStop where (each.stop_zone != nil and each distance_to self <= STOP_NEIGHBORING_DISTANCE)
+									sort_by (each distance_to self);
+			stop_zone.zone_stops <+ self; 		
+		}
 		//*/
 		/**************************************************************************************************************************/
 		/*** POPULATION ***/
@@ -243,7 +250,7 @@ global {
 							ind_origin_stop <- one_of(obstops);
 							// distance between origin and destination must be greater than the neighboring distance, or take a walk !
 							// prevent very short trips (<= STOP_NEIGHBORING_DISTANCE);
-							ind_destin_stop <- one_of(obstops where (each distance_to ind_origin_stop > STOP_NEIGHBORING_DISTANCE));
+							ind_destin_stop <- one_of(dbstops where (each distance_to ind_origin_stop > STOP_NEIGHBORING_DISTANCE));
 							if ind_destin_stop = nil {
 								ind_destin_stop <- last(dbstops sort_by (each distance_to self));
 							}
@@ -252,10 +259,19 @@ global {
 				}
 			}	
 		}
-		write "Total population: " + length(Individual);
+		write "Total population: " + length(Individual);	
+				
+		/*
+		create Individual  {
+			ind_origin_stop <- BusStop first_with(each.stop_id=33);
+			ind_destin_stop <- BusStop first_with(each.stop_id=78);
+			ind_origin_zone <- ind_origin_stop.stop_zone;
+			ind_destin_zone <- ind_destin_stop.stop_zone;
+		}
+		*/			
 		
 		write "Generating trip options ..";
-		list<Individual> individuals <- 1000 among Individual; //TODO number ?
+		list<Individual> individuals <- 500 among Individual; //TODO number ?
 		
 		ask individuals {
 			// if another individual with the same origin and destination bus stops has already a planning, just copy it
@@ -282,8 +298,8 @@ global {
 			}
 			if indiv != nil {
 				self.ind_origin_zone <- indiv.ind_origin_zone;
-				self.ind_origin_stop <- indiv.ind_origin_stop;
 				self.ind_destin_zone <- indiv.ind_destin_zone;
+				self.ind_origin_stop <- indiv.ind_origin_stop;
 				self.ind_destin_stop <- indiv.ind_destin_stop;
 				self.ind_trip_options <- copy(indiv.ind_trip_options);	
 			}

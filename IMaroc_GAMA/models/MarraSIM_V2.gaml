@@ -30,7 +30,7 @@ global {
 	geometry shape <- envelope (marrakesh_bus_lines);
 	
 	// simulation parameters
-	float step <- 2#second;// defining one simulation step as X seconds TODO
+	float step <- 1#seconds;
 	
 	float current_affluence <- 0.0;
 	list<float> hourly_affluence <- [0.000,0.000,0.000,0.000,0.000,0.000,0.05,0.050,0.100,0.100,0.050,0.050, // [00:00 -> 11:00]
@@ -51,17 +51,17 @@ global {
 		write "--+-- START OF INIT --+--" color: #green;
 		
 		if !save_data_on { // warn when save data is off
-			/*bool data_off_ok <- user_confirm("Confirm","Data saving is off. Do you want to proceed ?");
+			bool data_off_ok <- user_confirm("Confirm","Data saving is off. Do you want to proceed ?");
 			if !data_off_ok {
 				do die;
-			}*/
+			}
 		} else {
 			sim_id <- machine_time;
 			save 'traffic_on = ' + traffic_on + '\n' + 'transfer_on = ' + transfer_on + '\n' + 'time_tables_on = ' + time_tables_on
 					format: "text" rewrite: false to: "../results/data_"+sim_id+"/params.txt";
 
-			save "cycle,individual,origin_stop,destin_stop,origin_zone,destin_zone,"+
-					"trip_type,line,direction,ride_distance,walk_distance,wait_time,board_time,arrival_time"
+			save "cycle,individual,start_stop,end_stop,start_zone,end_zone,"+
+					"trip_type,line_type,line,direction,ride_distance,walk_distance,wait_time,board_time,arrival_time"
 					format: 'text' rewrite: true to: "../results/data_"+sim_id+"/completedtrips.csv";
 		}
 		
@@ -76,8 +76,8 @@ global {
 		// create busses, bus stops
 		//*
 		write "Creating bus lines and bus stops ...";
-		create BusStop from: marrakesh_bus_stops with: [stop_id::int(get("ID")), stop_name::get("NAME")]{
-			stop_zone <- first(PDUZone overlapping self);
+		create BusStop from: marrakesh_bus_stops with: [stop_id::int(get("ID")), stop_name::get("NAME"),
+								stop_zone::PDUZone first_with(each.zone_code = int(get("pduzone_id")))]{
 			if stop_zone = nil {
 				stop_zone <- PDUZone where (each distance_to self <= STOP_NEIGHBORING_DISTANCE) with_min_of (each distance_to self);
 			}
@@ -101,8 +101,8 @@ global {
 					if current_bl = nil {
 						bsout <- (dummy_geom first_with (each.g_name = bus_line_name and each.g_direction = DIRECTION_OUTGOING));
 						bsret <- (dummy_geom first_with (each.g_name = bus_line_name and each.g_direction = DIRECTION_RETURN));
-						bsoutpoints <- points_on(bsout,25#m);
-						bsretpoints <- points_on(bsret,25#m);
+						bsoutpoints <- points_on(bsout,25#meter);
+						bsretpoints <- points_on(bsret,25#meter);
 						
 						create BusLine returns: my_busline {
 							do init_line (bus_line_name, bsout.shape, bsret.shape);
@@ -126,7 +126,7 @@ global {
 				}
 			}
 			// clean unused bus stops
-			ask BusStop - remove_duplicates(BusLine accumulate (each.line_outgoing_stops.keys + each.line_return_stops.keys)) {
+			ask list(BusStop) - remove_duplicates(BusLine accumulate (each.line_outgoing_stops.keys + each.line_return_stops.keys)) {
 				do die;
 			}
 			ask dummy_geom { do die; }
@@ -161,9 +161,10 @@ global {
 		/**************************************************************************************************************************/
 		/*** BRT LINES ***/
 		/**************************************************************************************************************************/
+		//*
 		write "Creating BRT stops and lines ...";
-		create BRTStop from: marrakesh_brt_stops with: [stop_id::int(get("ID")), stop_name::get("NAME")]{
-			stop_zone <- first(PDUZone overlapping self);
+		create BRTStop from: marrakesh_brt_stops with: [stop_id::int(get("ID")), stop_name::get("NAME"),
+								stop_zone::PDUZone first_with(each.zone_code = int(get("pduzone_id")))]{
 			if stop_zone = nil {
 				stop_zone <- PDUZone where (each distance_to self <= STOP_NEIGHBORING_DISTANCE) with_min_of (each distance_to self);
 			}
@@ -217,10 +218,11 @@ global {
 		/**************************************************************************************************************************/
 		/*** TAXI LINES ***/
 		/**************************************************************************************************************************/
+		//*
 		if TAXI_ON {
 			write "Creating Taxi lines and stations ...";
-			create TaxiStop from: marrakesh_taxi_stations with: [stop_id::int(get("ID")), stop_name::get("NAME")]{
-				stop_zone <- first(PDUZone overlapping self);
+			create TaxiStop from: marrakesh_taxi_stations with: [stop_id::int(get("ID")), stop_name::get("NAME"),
+									stop_zone::PDUZone first_with(each.zone_code = int(get("pduzone_id")))]{
 				if stop_zone = nil {
 					stop_zone <- PDUZone where (each distance_to self <= STOP_NEIGHBORING_DISTANCE) with_min_of (each distance_to self);
 				}
@@ -260,8 +262,7 @@ global {
 					end_ts.stop_connected_taxi_lines <+ (self::DIRECTION_OUTGOING);
 					line_outgoing_locations <- remove_duplicates(line_outgoing_stops.values);
 					loop i from: 1 to: length(line_outgoing_locations) - 1 {
-						line_outgoing_dists<+ //line_outgoing_locations[i] = line_outgoing_locations[i-1] ? 0 : 
-												int(path_between(line_outgoing_graph, line_outgoing_locations[i],
+						line_outgoing_dists<+ int(path_between(line_outgoing_graph, line_outgoing_locations[i],
 													line_outgoing_locations[i-1]).shape.perimeter);
 					}
 					//########################//
@@ -287,8 +288,7 @@ global {
 					end_ts.stop_connected_taxi_lines <+ (self::DIRECTION_RETURN);
 					line_return_locations <- remove_duplicates(line_return_stops.values);
 					loop i from: 1 to: length(line_return_locations) - 1 {
-						line_return_dists<+ //line_return_locations[i] = line_return_locations[i-1] ? 0 : 
-											int(path_between(line_return_graph, line_return_locations[i],
+						line_return_dists<+ int(path_between(line_return_graph, line_return_locations[i],
 												line_return_locations[i-1]).shape.perimeter);
 					}
 				}
@@ -297,8 +297,8 @@ global {
 			write "Creating Taxi vehicles ...";
 			ask TaxiLine {
 				int n_vehicles <- DEFAULT_NUMBER_TAXI;
-				do create_vehicles (1/*int(n_vehicles/2)*/, DIRECTION_OUTGOING);
-				//do create_vehicles (int(n_vehicles/2), DIRECTION_RETURN);
+				do create_vehicles (int(n_vehicles/2), DIRECTION_OUTGOING);
+				do create_vehicles (int(n_vehicles/2), DIRECTION_RETURN);
 			}
 			ask dummy_geom { do die; }
 		}
@@ -326,9 +326,9 @@ global {
 		/**************************************************************************************************************************/
 		/*** POPULATION ***/
 		/**************************************************************************************************************************/
-		//*
+		/*
 		write "Creating population ...";
-		matrix popMatrix <- matrix(csv_file("../includes/population/populations_1000.csv",true));
+		matrix popMatrix <- matrix(csv_file("../includes/population/populations.csv",true));
 		loop i from: 0 to: popMatrix.rows -1 {
 			create Individual {
 				ind_id <- int(popMatrix[0,i]);
@@ -340,7 +340,7 @@ global {
 		}
 		
 		write "Creating trips ...";
-		matrix tripMatrix <- matrix(csv_file("../includes/population/trips_1000.csv",true));
+		matrix tripMatrix <- matrix(csv_file("../includes/population/trips.csv",true));
 		loop i from: 0 to: tripMatrix.rows -1 {
 			create MTrip returns: mytrip {
 				self.trip_id <- int(tripMatrix[0,i]);
@@ -353,7 +353,7 @@ global {
 		}
 		
 		write "Creating trip options...";
-		matrix popTripMatrix <- matrix(csv_file("../includes/population/pop_trips_1000.csv",true));
+		matrix popTripMatrix <- matrix(csv_file("../includes/population/pop_trips.csv",true));
 		int id_0 <- -1;
 		int id_x;
 		MTrip mtp;
@@ -398,6 +398,7 @@ global {
 		/* ####### */
 		// ask a random number of people (N%) to travel 
 		int nn <- int(current_affluence / (60/Nminutes) * length(Individual));
+		
 		if nn > 0 {
 			write formatted_time() + nn + " new people are travelling ...";
 			ask nn among (Individual where !(each.ind_moving or each.ind_arrived)) {
@@ -458,8 +459,8 @@ experiment MarraSIM type: gui {
 	text "SAVE DATA parameter is " + (save_data_on ? "ON" : "OFF") category:"Simulation" color: #darkred font: font("Tahoma",10,#bold);
 	parameter "CONGESTION" category:"Traffic" var: traffic_on {ask world {do traffic_on_off;}}
 	
-	parameter "FREE TRANSFER" category:"Mobility" var: transfer_on {write "Free ticket transfer is " + (transfer_on? "ON" : "OFF");}
-	parameter "TIME TABLES" category:"Mobility" var: time_tables_on {write "Time tables availability is " + (time_tables_on? "ON" : "OFF");}
+	parameter "FREE TRANSFER" category: "Mobility" var: transfer_on {write "Free ticket transfer is " + (transfer_on? "ON" : "OFF");}
+	parameter "TIME TABLES" category: "Mobility" var: time_tables_on {write "Time tables availability is " + (time_tables_on? "ON" : "OFF");}
 	
 	
 	output {
@@ -483,7 +484,7 @@ experiment MarraSIM type: gui {
 			species BRTVehicle;
 		}
 		
-		display Mobility type: java2D background: #black toolbar:false {
+		/*display Mobility type: java2D background: #black toolbar:false {
 			chart "Number of Completed Trips" type: series y_tick_line_visible: true x_tick_line_visible: false
 				background: #black color: #white size: {1,0.33} position: {0,0} x_label: "Time" {
 				data "BUS" color: #blue value: number_of_completed_trips[0] marker_shape: marker_empty;
@@ -502,7 +503,7 @@ experiment MarraSIM type: gui {
 				data "BRT" color: #red value: mean_trip_time_completed_trips[1] marker_shape: marker_empty;
 				data "TAXI" color: #orange value: mean_trip_time_completed_trips[2] marker_shape: marker_empty;
 			}	
-		}
+		}*/
 		
 		/*display "Waiting People" type: opengl background: #black toolbar:false{
 			camera 'default' location: {76018.3846,71284.6176,21920.7288} target: {76018.3846,71284.235,0.0};

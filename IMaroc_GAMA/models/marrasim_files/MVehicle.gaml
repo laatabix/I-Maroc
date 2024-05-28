@@ -94,7 +94,7 @@ species MVehicle skills: [moving] {
 		}
 
 		// the bus has reached its next bus stop
-		if location =v_next_loc {//overlaps (10#meter around v_next_loc) {
+		if location = v_next_loc {//overlaps (10#meter around v_next_loc) {
 			v_stop_wait_time <- v_line.line_type = LINE_TYPE_TAXI ? 0 : MIN_WAIT_TIME_STOP;
 			v_current_stops <- v_next_stops;
 			v_current_loc <- v_next_loc;
@@ -136,23 +136,32 @@ species MVehicle skills: [moving] {
 						droppers <- droppers + 1;
 						ind_current_trip.trip_end_stop.stop_arrived_people <+ self;
 						
-						if ind_current_trip.trip_end_stop != ind_destin_stop {
-							int walked_dist <- ind_used_trips at ind_current_trip;
-							walked_dist <- walked_dist + int(ind_destin_stop distance_to ind_current_trip.trip_end_stop);
-							put walked_dist at: ind_current_trip in:ind_used_trips;
+						int walked_dist <- ind_used_trips at ind_current_trip;
+						if myself.v_line.line_type = LINE_TYPE_TAXI {
+							walked_dist <- myself.v_current_direction = DIRECTION_OUTGOING ?
+									int(ind_destin_stop distance_to (myself.v_line.line_outgoing_stops at ind_destin_stop)) :
+									int(ind_destin_stop distance_to (myself.v_line.line_return_stops at ind_destin_stop));
+						} else {
+							if ind_current_trip.trip_end_stop != ind_destin_stop {
+								walked_dist <- walked_dist + int(ind_destin_stop distance_to ind_current_trip.trip_end_stop);
+							}	
 						}
+						put walked_dist at: ind_current_trip in: ind_used_trips;
+						
 						// take the last list
 						my_ind_times <- last(ind_times);
 						
 						if save_data_on {
+							int z1; int z2;
 							if !empty(ind_used_trips) {
 								loop i from: 0 to: length(ind_used_trips) - 1 {
 									MTrip mtp <- ind_used_trips.keys[i];
+									z1 <- mtp.trip_start_stop.stop_zone != nil ? mtp.trip_start_stop.stop_zone.zone_code : -1;
+									z2 <- mtp.trip_end_stop.stop_zone != nil ? mtp.trip_end_stop.stop_zone.zone_code : -1;
 									save '' + cycle + ',' + ind_id + ',' + mtp.trip_start_stop.stop_id + ',' + mtp.trip_end_stop.stop_id
-										+ ',' + mtp.trip_start_stop.stop_zone.zone_code + ',' + mtp.trip_end_stop.stop_zone.zone_code
-										+ ',' + ind_trip_options at mtp + ',' + mtp.trip_line.line_name + ',' +
-										mtp.trip_line_direction + ',' + mtp.trip_ride_distance + ',' +
-										ind_used_trips at mtp + ',' + ind_times[i][0] + ',' + ind_times[i][1] + ',' + ind_times[i][2]
+										+ ',' + z1 + ',' + z2 + ',' + ind_trip_options at mtp + ',' + mtp.trip_line.line_type + ','
+										+ mtp.trip_line.line_name + ',' + mtp.trip_line_direction + ',' + mtp.trip_ride_distance + ','
+										+ ind_used_trips at mtp + ',' + ind_times[i][0] + ',' + ind_times[i][1] + ',' + ind_times[i][2]
 									format: "text" rewrite: false to: "../results/data_"+sim_id+"/completedtrips.csv";		
 								}	
 							}	
@@ -225,7 +234,7 @@ species MVehicle skills: [moving] {
 							// first, retrieve individuals with no single trips on this vehicle (the vehicle can only transfer them)
 							list<Individual> inds_to_remove <- waiting_individuals where (each.ind_current_trip_index = 0
 													and empty(each.ind_trip_options.pairs where (each.value = TRIP_SINGLE
-																and each.key.trip_line = v_line
+																and each.key.trip_line = v_line // TODO include or not taxis in transfer
 																and each.key.trip_line_direction = v_current_direction
 																and each.key.trip_start_stop in first(v_current_stops).stop_neighbors)));
 							// see if these individuals can do a single-trip on another bus
@@ -237,7 +246,9 @@ species MVehicle skills: [moving] {
 															and each.key.trip_start_stop in first(v_current_stops).stop_neighbors))));
 								// remove
 								waiting_individuals <- waiting_individuals - inds_to_remove;
-								write "##### " + inds_to_remove + " removed by TRANSFER form: " + self + " at: " + first(v_current_stops);
+								if !empty(inds_to_remove) {
+									write "##### " + inds_to_remove + " removed by TRANSFER form: " + self + " at: " + first(v_current_stops);
+								}
 							}
 						}
 						//############################## timetables ##############################/
@@ -247,7 +258,7 @@ species MVehicle skills: [moving] {
 							loop indiv over: waiting_individuals {
 								MTrip besttrip <- nil;
 								int besttrip_type;
-								int mycorresps <- 0;
+								//int mycorresps <- 0;
 								// can this bus take the individual to his destination ?
 								// first consider only trips that arrive to final destination (SINGLE or SECOND trips) 
 								map<MTrip,int> mtrips <- map(indiv.ind_trip_options.pairs where (each.key.trip_line = v_line
@@ -260,21 +271,21 @@ species MVehicle skills: [moving] {
 									pair<MTrip,int> ppr <- mtrips.pairs where (each.key.trip_end_stop in v_time_table.keys)
 																		with_min_of (v_time_table at each.key.trip_end_stop);
 									besttrip <- ppr != nil ? ppr.key : nil;
-								} else {
+								}// else {
 									// if no SINGLE or SECOND trips are found, then maybe a FIRST
-									if indiv.ind_current_trip_index = 0 {
+									/*if indiv.ind_current_trip_index = 0 {
 										mtrips <- map(indiv.ind_trip_options.pairs where (each.key.trip_line = v_line
 											and each.key.trip_line_direction = v_current_direction and each.value = TRIP_FIRST
 											and each.key.trip_start_stop in first(v_current_stops).stop_neighbors));
 										
 										// then find time to arrive to the best correspondance through FIRST trips
 										list res <- world.best_correspondance(mtrips.pairs where
-												(each.value = TRIP_FIRST /*and each.key.trip_end_stop in v_time_table.keys*/) collect each.key,
+												(each.value = TRIP_FIRST /*and each.key.trip_end_stop in v_time_table.keys*//*) collect each.key,
 												indiv.ind_trip_options.pairs where (each.value = TRIP_SECOND) collect each.key);
 										besttrip <- MTrip(res[0]);
 										mycorresps <- int(res[1]);
-									}
-								}
+									}*/
+								//}
 								//
 								if besttrip != nil {
 									besttrip_type <- mtrips at besttrip;
@@ -292,8 +303,8 @@ species MVehicle skills: [moving] {
 										 		  		  or (indiv.ind_current_trip_index = 1 and each.value = TRIP_SECOND))));
 										} else {
 											// if the best trip on this bus takes to a correspondance, compare with all
-											othertrips <- map(indiv.ind_trip_options.pairs where (each.key.trip_line != v_line and
-												/*each.value = TRIP_FIRST and*/ each.key.trip_start_stop in first(v_current_stops).stop_neighbors));
+										//	othertrips <- map(indiv.ind_trip_options.pairs where (each.key.trip_line != v_line and
+											//	/*each.value = TRIP_FIRST and*/ each.key.trip_start_stop in first(v_current_stops).stop_neighbors));
 										}
 										loop mtrp over: othertrips.keys {
 											int min_time_to_dest_others <- #max_int;
@@ -321,7 +332,7 @@ species MVehicle skills: [moving] {
 													int ttm <- veh.v_time_table at mtrp.trip_end_stop;
 													
 													if (ttm > veh.v_time_table at first(v_current_stops)) and ttm < min_time_to_dest_others {
-														if othertrips at mtrp = TRIP_FIRST {
+														/*if othertrips at mtrp = TRIP_FIRST {
 															list<MTrip> myseconds <- indiv.ind_trip_options.pairs where (each.value = TRIP_SECOND
 																				and each.key.trip_start_stop in mtrp.trip_end_stop.stop_neighbors)
 																					collect each.key;
@@ -331,9 +342,9 @@ species MVehicle skills: [moving] {
 																	min_time_to_dest_others <- ttm;
 																}	
 															}
-														} else {
+														} else {*/
 															min_time_to_dest_others <- ttm;
-														}
+														//}
 													}
 												}
 											}
@@ -353,24 +364,36 @@ species MVehicle skills: [moving] {
 						
 						int takens <- 0;
 						ask n_individs among waiting_individuals {
-							relevant_stops <- myself.v_line.line_type = LINE_TYPE_TAXI ? myself.v_current_stops :
-														first(myself.v_current_stops).stop_neighbors;
-							ind_current_trip <- (ind_trip_options.keys where (each.trip_line = myself.v_line
-														and each.trip_line_direction = myself.v_current_direction
-														and each.trip_start_stop in relevant_stops))
-												with_min_of (each.trip_ride_distance);
-							takens <- takens + 1;
-							myself.v_passengers <+ self;
-							ind_waiting_stop.stop_waiting_people >- self;
-							ind_times[ind_current_trip_index] <+ int(time); // end of waiting time, board time
-							myself.v_stop_wait_time <- myself.v_stop_wait_time + V_TIME_TAKE_IND;
-							
-							// walking distance
-							int walked_dist <- 0;
-							if ind_current_trip.trip_start_stop != ind_waiting_stop {
-								walked_dist <- int(ind_waiting_stop distance_to ind_current_trip.trip_start_stop);
+							if ind_waiting_stop.stop_waiting_people contains self { //prevent multiple vahicles taking the same individual at the same time
+								ind_waiting_stop.stop_waiting_people >- self;
+								takens <- takens + 1;
+								myself.v_passengers <+ self;
+								myself.v_stop_wait_time <- myself.v_stop_wait_time + V_TIME_TAKE_IND;
+								
+								relevant_stops <- myself.v_line.line_type = LINE_TYPE_TAXI ? myself.v_current_stops :
+															first(myself.v_current_stops).stop_neighbors;
+								ind_current_trip <- (ind_trip_options.keys where (each.trip_line = myself.v_line
+															and each.trip_line_direction = myself.v_current_direction
+															and each.trip_start_stop in relevant_stops))
+													with_min_of (each.trip_ride_distance);
+								
+								ind_times[ind_current_trip_index] <+ int(time); // end of waiting time, board time
+								// walking distance
+								int walked_dist <- 0;
+								if myself.v_line.line_type = LINE_TYPE_TAXI {
+									walked_dist <- myself.v_current_direction = DIRECTION_OUTGOING ?
+											int(ind_waiting_stop distance_to (myself.v_line.line_outgoing_stops at ind_waiting_stop)) :
+											int(ind_waiting_stop distance_to (myself.v_line.line_return_stops at ind_waiting_stop));
+								} else {
+									if ind_current_trip.trip_start_stop != ind_waiting_stop {
+										walked_dist <- int(ind_waiting_stop distance_to ind_current_trip.trip_start_stop);
+									}	
+								}
+								ind_used_trips <+ ind_current_trip::walked_dist;
 							}
-							ind_used_trips <+ ind_current_trip::walked_dist;
+
+
+
 						}	
 						if takens > 0 {
 							write world.formatted_time() + v_line.line_name  + ' (' + v_current_direction + ') is taking '
