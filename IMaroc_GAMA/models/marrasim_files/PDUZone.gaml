@@ -16,7 +16,7 @@ global {
 	list<rgb> level_colors <- [#white,#yellow,#orange,#red,#darkred];
 	
 	// city area
-	geometry city_area;
+	//geometry city_area;
 	
 	// format the current time to a printable format [hh:mm:ss]
 	string formatted_time { 

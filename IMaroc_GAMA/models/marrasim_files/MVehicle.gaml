@@ -30,7 +30,7 @@ global {
 			v_speed <- BUS_SUBURBAN_SPEED;
 			v_in_city <- false;
 		}
-		ask sub_urban_busses overlapping city_area {
+		ask sub_urban_busses where (first(each.v_current_stops).stop_zone != nil) {
 			v_speed <- traffic_on ? v_line.line_com_speed : BUS_URBAN_SPEED;
 			v_in_city <- true;
 		}
@@ -52,6 +52,7 @@ species MVehicle skills: [moving] {
 	point v_current_loc;
 	float v_stop_wait_time <- -1.0;
 	bool v_in_city <- true;
+	bool v_at_terminus <- false;
 	
 	list<Individual> v_passengers <- [];
 	map<MStop,int> v_time_table <- [];
@@ -92,9 +93,9 @@ species MVehicle skills: [moving] {
 		if v_stop_wait_time = 0 {
 			v_stop_wait_time <- -1.0;
 		}
-
+		
 		// the bus has reached its next bus stop
-		if location = v_next_loc {//overlaps (10#meter around v_next_loc) {
+		if location overlaps (10#meter around v_next_loc) {
 			v_stop_wait_time <- v_line.line_type = LINE_TYPE_TAXI ? 0 : MIN_WAIT_TIME_STOP;
 			v_current_stops <- v_next_stops;
 			v_current_loc <- v_next_loc;
@@ -230,11 +231,11 @@ species MVehicle skills: [moving] {
 						
 						//############################## transfer ##############################/			
 						// if transfer is off, remove individuals with double-trip that can still wait for a single-trip
-						if !transfer_on and v_line.line_type != LINE_TYPE_TAXI{
+						if !transfer_on and v_line.line_type != LINE_TYPE_TAXI {
 							// first, retrieve individuals with no single trips on this vehicle (the vehicle can only transfer them)
 							list<Individual> inds_to_remove <- waiting_individuals where (each.ind_current_trip_index = 0
 													and empty(each.ind_trip_options.pairs where (each.value = TRIP_SINGLE
-																and each.key.trip_line = v_line // TODO include or not taxis in transfer
+																and each.key.trip_line = v_line
 																and each.key.trip_line_direction = v_current_direction
 																and each.key.trip_start_stop in first(v_current_stops).stop_neighbors)));
 							// see if these individuals can do a single-trip on another bus
@@ -251,6 +252,7 @@ species MVehicle skills: [moving] {
 								}
 							}
 						}
+
 						//############################## timetables ##############################/
 						if time_tables_on and v_line.line_type != LINE_TYPE_TAXI {
 							list<Individual> inds_to_remove <- [];
@@ -406,22 +408,32 @@ species MVehicle skills: [moving] {
 			
 			// to know the next stop
 			if v_current_direction = DIRECTION_OUTGOING { // outgoing
-				if v_current_stops contains last(v_line.line_outgoing_stops.keys) { // last outgoing stop
-					v_current_direction <- DIRECTION_RETURN;
+				if v_current_stops contains last(v_line.line_outgoing_stops.keys) and !v_at_terminus { // last outgoing stop
 					v_next_loc <- v_line.line_return_locations[0];
 					v_next_stops <- (v_line.line_return_stops.pairs where (each.value = v_next_loc)) collect each.key;
+					v_at_terminus <- true;
 				} else {
-					v_next_loc <- v_line.line_outgoing_locations[(v_line.line_outgoing_locations index_of v_current_loc) +1];
-					v_next_stops <- (v_line.line_outgoing_stops.pairs where (each.value = v_next_loc)) collect each.key;
+					if v_current_stops contains first(v_line.line_return_stops.keys) {
+						v_current_direction <- DIRECTION_RETURN;
+						v_at_terminus <- false;
+					} else {
+						v_next_loc <- v_line.line_outgoing_locations[(v_line.line_outgoing_locations index_of v_current_loc) +1];
+						v_next_stops <- (v_line.line_outgoing_stops.pairs where (each.value = v_next_loc)) collect each.key;
+					}
 				}
 			} else { // return
-				if v_current_stops contains last(v_line.line_return_stops.keys) { // last return stop
-					v_current_direction <- DIRECTION_OUTGOING;
+				if v_current_stops contains last(v_line.line_return_stops.keys) and !v_at_terminus { // last return stop
 					v_next_loc <- v_line.line_outgoing_locations[0];
 					v_next_stops <- (v_line.line_outgoing_stops.pairs where (each.value = v_next_loc)) collect each.key;
+					v_at_terminus <- true; // useful when the last outgoing stop is the same as first return
 				} else {
-					v_next_loc <- v_line.line_return_locations[(v_line.line_return_locations index_of v_current_loc) +1];
-					v_next_stops <- (v_line.line_return_stops.pairs where (each.value = v_next_loc)) collect each.key;
+					if v_current_stops contains first(v_line.line_outgoing_stops.keys) {
+						v_current_direction <- DIRECTION_OUTGOING;
+						v_at_terminus <- false;
+					} else {
+						v_next_loc <- v_line.line_return_locations[(v_line.line_return_locations index_of v_current_loc) +1];
+						v_next_stops <- (v_line.line_return_stops.pairs where (each.value = v_next_loc)) collect each.key;	
+					}
 				}
 			}
 			if !(v_line.line_type = LINE_TYPE_TAXI and v_stop_wait_time = 0) {

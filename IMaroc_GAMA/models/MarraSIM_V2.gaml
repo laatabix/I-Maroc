@@ -68,7 +68,7 @@ global {
 		// create the environment: city, districts, roads, traffic signals
 		write "Creating the city environment ...";
 		create PDUZone from: marrakesh_pdu with: [zone_code::int(get("id")), zone_name::get("label")];
-		city_area <- envelope(PDUZone);
+		//city_area <- envelope(PDUZone);
 		
 		/**************************************************************************************************************************/
 		/*** BUS LINES ***/
@@ -147,21 +147,28 @@ global {
 					line_com_speed <- float(busDataMatrix[7, yindex]) #km/#h;
 					line_interval_time_m <- float(busDataMatrix[4, yindex]) #minute;
 				}
+				
+				
+				//TODO n vehicles = distance * speed / interval time
+				
+				
 				do create_vehicles (int(n_vehicles/2), DIRECTION_OUTGOING);
 				do create_vehicles (int(n_vehicles/2), DIRECTION_RETURN);
 				ask n_large_vehicles among BusVehicle where (each.v_line = self) {
 					v_capacity <- BUS_LARGE_CAPACITY;
 				}
-			}
-			ask BusLine - (BusLine inside city_area) {
-				sub_urban_busses <<+ BusVehicle where (each.v_line = self);
+				//
+				if self.line_outgoing_stops.keys[0].stop_zone = nil or
+					self.line_return_stops.keys[0].stop_zone = nil {
+					sub_urban_busses <<+ BusVehicle where (each.v_line = self);	
+				}
 			}
 			urban_busses <<+ list(BusVehicle) - sub_urban_busses;
 		}
 		/**************************************************************************************************************************/
 		/*** BRT LINES ***/
 		/**************************************************************************************************************************/
-		//*
+		/*
 		write "Creating BRT stops and lines ...";
 		create BRTStop from: marrakesh_brt_stops with: [stop_id::int(get("ID")), stop_name::get("NAME"),
 								stop_zone::PDUZone first_with(each.zone_code = int(get("pduzone_id")))]{
@@ -218,7 +225,7 @@ global {
 		/**************************************************************************************************************************/
 		/*** TAXI LINES ***/
 		/**************************************************************************************************************************/
-		//*
+		/*
 		if TAXI_ON {
 			write "Creating Taxi lines and stations ...";
 			create TaxiStop from: marrakesh_taxi_stations with: [stop_id::int(get("ID")), stop_name::get("NAME"),
@@ -472,7 +479,7 @@ experiment MarraSIM type: gui {
 	            draw "" + world.formatted_time() at: {20#px, 25#px} font: AFONT0 color: #yellow;
 	        }
 	        
-	        species PDUZone refresh: false;
+	        //species PDUZone refresh: false;
 			species BusLine refresh: false;
 			species TaxiLine refresh: false;
 			species BRTLine refresh: false;
