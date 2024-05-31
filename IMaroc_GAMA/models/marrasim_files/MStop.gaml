@@ -43,10 +43,8 @@ global {
 			return [];
 		}
 		
-		
-		
-		MStop stop1;// <- first(li1);
-		MStop stop2;//<- li2 contains stop1 ? stop1 : li2 closest_to stop1;
+		MStop stop1;
+		MStop stop2;
 		MStop clos;
 		float min_dist <- #max_float;
 		float ddst;
@@ -64,10 +62,6 @@ global {
 				stop2 <- clos;
 			}
 		}
-		
-		/*if stop1 != stop2 {
-			stop1 <- li1 contains stop2 ? stop2 : li1 closest_to stop2;
-		}*/
 		return [stop1,stop2];
 	}
 }
@@ -89,7 +83,8 @@ species MStop schedules: [] parallel: true {
 	list<pair<MLine,int>> stop_lines <- [];
 	// for each stop, the taxi lines (+direction) that an Individual can take + closest line on the taxiline to the stop
 	list<pair<TaxiLine,int>> stop_connected_taxi_lines <- [];
-}	
+	//map<MLine,float> stop_last_vehicle_depart_time <-[];
+}
 
 species BusStop parent: MStop {
 	geometry shape <- circle(40#meter);

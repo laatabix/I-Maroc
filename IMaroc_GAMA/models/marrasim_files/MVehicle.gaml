@@ -52,7 +52,7 @@ species MVehicle skills: [moving] {
 	point v_current_loc;
 	float v_stop_wait_time <- -1.0;
 	bool v_in_city <- true;
-	bool v_at_terminus <- false;
+	//bool v_at_terminus <- false;
 	
 	list<Individual> v_passengers <- [];
 	map<MStop,int> v_time_table <- [];
@@ -111,6 +111,10 @@ species MVehicle skills: [moving] {
 						v_time_table <+ v_line.line_outgoing_stops.keys[i] :: v_time_table at v_line.line_outgoing_stops.keys[i-1] +
 									(v_line.line_outgoing_dists[i-1] / v_speed) + v_stop_wait_time;
 					}
+					/*if first(v_current_stops).stop_last_vehicle_depart_time at v_line != nil {
+						v_stop_wait_time <- v_stop_wait_time + (max([0, (first(v_current_stops).stop_last_vehicle_depart_time at v_line + v_line.line_interval_time_m) - time]));
+						write "sssssss " + self + " :: " + v_line.line_name + " ** " +  v_stop_wait_time;
+					}*/
 				}
 				// first return stop : filling timetable of return 
 				else if first(v_current_stops) = first(v_line.line_return_stops.keys) and v_current_direction = DIRECTION_RETURN {
@@ -408,38 +412,57 @@ species MVehicle skills: [moving] {
 			
 			// to know the next stop
 			if v_current_direction = DIRECTION_OUTGOING { // outgoing
-				if v_current_stops contains last(v_line.line_outgoing_stops.keys) and !v_at_terminus { // last outgoing stop
-					v_next_loc <- v_line.line_return_locations[0];
-					v_next_stops <- (v_line.line_return_stops.pairs where (each.value = v_next_loc)) collect each.key;
-					v_at_terminus <- true;
-				} else {
-					if v_current_stops contains first(v_line.line_return_stops.keys) {
-						v_current_direction <- DIRECTION_RETURN;
-						v_at_terminus <- false;
+				if v_current_stops contains last(v_line.line_outgoing_stops.keys) { //and !v_at_terminus { // last outgoing stop
+					if v_line.line_is_urban {
+						urban_busses >- self;
 					} else {
+						sub_urban_busses >- self;	
+					}
+					do die;
+					//v_next_loc <- v_line.line_return_locations[0];
+					//v_next_stops <- (v_line.line_return_stops.pairs where (each.value = v_next_loc)) collect each.key;
+					//v_at_terminus <- true;
+				} else {
+					/*if v_current_stops contains first(v_line.line_return_stops.keys) {
+						v_current_direction <- DIRECTION_RETURN;
+						//v_at_terminus <- false;
+					} else {*/
 						v_next_loc <- v_line.line_outgoing_locations[(v_line.line_outgoing_locations index_of v_current_loc) +1];
 						v_next_stops <- (v_line.line_outgoing_stops.pairs where (each.value = v_next_loc)) collect each.key;
-					}
+					//}
 				}
 			} else { // return
-				if v_current_stops contains last(v_line.line_return_stops.keys) and !v_at_terminus { // last return stop
-					v_next_loc <- v_line.line_outgoing_locations[0];
-					v_next_stops <- (v_line.line_outgoing_stops.pairs where (each.value = v_next_loc)) collect each.key;
-					v_at_terminus <- true; // useful when the last outgoing stop is the same as first return
-				} else {
-					if v_current_stops contains first(v_line.line_outgoing_stops.keys) {
-						v_current_direction <- DIRECTION_OUTGOING;
-						v_at_terminus <- false;
+				if v_current_stops contains last(v_line.line_return_stops.keys) {//} and !v_at_terminus { // last return stop
+					if v_line.line_is_urban {
+						urban_busses >- self;
 					} else {
+						sub_urban_busses >- self;	
+					}
+					do die;
+					//v_next_loc <- v_line.line_outgoing_locations[0];
+					//v_next_stops <- (v_line.line_outgoing_stops.pairs where (each.value = v_next_loc)) collect each.key;
+					//v_at_terminus <- true; // useful when the last outgoing stop is the same as first return
+				} else {
+					/*if v_current_stops contains first(v_line.line_outgoing_stops.keys) {
+						v_current_direction <- DIRECTION_OUTGOING;
+						//v_at_terminus <- false;
+					} else {*/
 						v_next_loc <- v_line.line_return_locations[(v_line.line_return_locations index_of v_current_loc) +1];
 						v_next_stops <- (v_line.line_return_stops.pairs where (each.value = v_next_loc)) collect each.key;	
-					}
+					//}
 				}
 			}
+			// add the daparture time of vehicle from current_stops
+			/*if v_line.line_type != LINE_TYPE_TAXI {
+				ask v_current_stops {
+					put time in: stop_last_vehicle_depart_time at: myself.v_line;
+				}
+			}*/
+			
 			if !(v_line.line_type = LINE_TYPE_TAXI and v_stop_wait_time = 0) {
 				return;	
 			}
-		}
+		} // en of location overlaps
 			
 		do goto target: v_next_loc speed: v_speed
 					on: v_current_direction = DIRECTION_OUTGOING ? v_line.line_outgoing_graph : v_line.line_return_graph;

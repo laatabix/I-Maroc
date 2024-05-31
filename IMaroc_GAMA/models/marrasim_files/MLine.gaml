@@ -21,8 +21,7 @@ global {
 	int DEFAULT_NUMBER_BRT <- 4;
 	int DEFAULT_NUMBER_TAXI <- 6;
 	
-	float DEFAULT_BUS_INTERVAL_TIME <- 20#minute;
-	float DEFAULT_TAXI_INTERVAL_TIME <- 10#minute;
+
 }
 
 /*******************************/
@@ -33,8 +32,9 @@ species MLine schedules: [] parallel: true {
 	int line_id;
 	string line_name;
 	int line_type;
+	bool line_is_urban <- true;
 	float line_com_speed <- BUS_URBAN_SPEED;
-	float line_interval_time_m <- DEFAULT_BUS_INTERVAL_TIME;
+	float line_interval_time_m <- DEFAULT_INTERVAL_TIME_BUS_URBAN;
 	map<MStop,point> line_outgoing_stops <- []; // list of bus stops on an outgoing path
 	map<MStop,point> line_return_stops <- []; // bus stops on the return path
 	geometry line_outgoing_shape;	
@@ -47,6 +47,21 @@ species MLine schedules: [] parallel: true {
 	// (for stops having same location in case of taxi for example)
 	list<point> line_outgoing_locations <- [];
 	list<point> line_return_locations <- [];
+	
+	
+	reflex generate_vehicle when: int(time) mod int(line_interval_time_m) = 0  {
+		do create_vehicles (1, DIRECTION_OUTGOING);
+		do create_vehicles (1, DIRECTION_RETURN);
+		
+		if save_data_on {
+			list<MVehicle> mvs <- (agents of_generic_species MVehicle) where (each.v_line = self);
+			write ""+line_name+" :: " +length(mvs);
+			save "" + cycle + "," + line_name + "," + line_is_urban + "," +
+					length(mvs where (each.v_current_direction = DIRECTION_OUTGOING)) + "," +
+					length(mvs where (each.v_current_direction = DIRECTION_RETURN)) + "\n"
+				format: 'text' rewrite: false to: "../results/data_"+sim_id+"/nvehicles.csv";
+		}
+	}
 	
 	//---------------------------------------//
 	action init_line (string nm, geometry out, geometry ret) {
@@ -67,6 +82,11 @@ species MLine schedules: [] parallel: true {
 					v_stop_wait_time <- (myself.line_interval_time_m * i);
 					if traffic_on {
 						v_speed <- myself.line_com_speed;
+					}
+					if myself.line_is_urban {
+						urban_busses <+ self;
+					} else {
+						sub_urban_busses <+ self;	
 					}
 				}
 			}
@@ -165,6 +185,7 @@ species BRTLine parent: MLine {
 	
 	init {
 		line_type <- LINE_TYPE_BRT;
+		line_interval_time_m <- DEFAULT_INTERVAL_TIME_BRT;
 	}
 	
 	aspect default {
@@ -177,7 +198,7 @@ species TaxiLine parent: MLine {
 	
 	init {
 		line_type <- LINE_TYPE_TAXI;
-		line_interval_time_m <- DEFAULT_TAXI_INTERVAL_TIME;
+		line_interval_time_m <- DEFAULT_INTERVAL_TIME_TAXI;
 	}
 	
 	aspect default {
