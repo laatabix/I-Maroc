@@ -84,7 +84,7 @@ species PDUZone schedules: [] parallel: true {
 	rgb bd_color <- #lightgray;
 	
 	aspect default {
-		draw shape color: #black border: #white;
+		draw shape color: #black border: #lightgray;
 	}
 	
 	aspect wait_people {

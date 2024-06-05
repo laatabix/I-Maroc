@@ -55,8 +55,7 @@ species MLine schedules: [] parallel: true {
 		
 		if save_data_on {
 			list<MVehicle> mvs <- (agents of_generic_species MVehicle) where (each.v_line = self);
-			write ""+line_name+" :: " +length(mvs);
-			save "" + cycle + "," + line_name + "," + line_is_urban + "," +
+			save "" + cycle + "," + line_type + ',' + line_name + "," + line_is_urban + "," +
 					length(mvs where (each.v_current_direction = DIRECTION_OUTGOING)) + "," +
 					length(mvs where (each.v_current_direction = DIRECTION_RETURN)) + "\n"
 				format: 'text' rewrite: false to: "../results/data_"+sim_id+"/nvehicles.csv";

@@ -14,7 +14,7 @@ import "MTrip.gaml"
 global {
 	
 	// time to wait for single-trips before taking a double-trip when transfer is off
-	int IND_WAITING_TIME_FOR_SINGLE_TRIPS <- int(30#minute);
+	int IND_WAITING_TIME_TRANSFER <- int(30#minute);
 	
 }
 

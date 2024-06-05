@@ -53,6 +53,7 @@ species MVehicle skills: [moving] {
 	float v_stop_wait_time <- -1.0;
 	bool v_in_city <- true;
 	//bool v_at_terminus <- false;
+	//bool v_is_over <- false;
 	
 	list<Individual> v_passengers <- [];
 	map<MStop,int> v_time_table <- [];
@@ -94,8 +95,24 @@ species MVehicle skills: [moving] {
 			v_stop_wait_time <- -1.0;
 		}
 		
+		// prevent two vehicles from working (boarding people!) on the same stop at the same time
+		/*if v_is_over {
+			first(v_current_stops).stop_current_stopping_vehicles >- self;
+			v_is_over <- false;
+		}*/
+		
 		// the bus has reached its next bus stop
 		if location overlaps (10#meter around v_next_loc) {
+			/*int idx_v <- first(v_next_stops).stop_current_stopping_vehicles index_of self;
+			// the vehicle arrives to the stop for the first time
+			if idx_v = -1 {
+				first(v_next_stops).stop_current_stopping_vehicles <+ self;
+				return;
+			} // the vehicle is not the first at the fifo list, return 
+			else if idx_v > 0 {
+				return;
+			}*/
+			
 			v_stop_wait_time <- v_line.line_type = LINE_TYPE_TAXI ? 0 : MIN_WAIT_TIME_STOP;
 			v_current_stops <- v_next_stops;
 			v_current_loc <- v_next_loc;
@@ -111,10 +128,6 @@ species MVehicle skills: [moving] {
 						v_time_table <+ v_line.line_outgoing_stops.keys[i] :: v_time_table at v_line.line_outgoing_stops.keys[i-1] +
 									(v_line.line_outgoing_dists[i-1] / v_speed) + v_stop_wait_time;
 					}
-					/*if first(v_current_stops).stop_last_vehicle_depart_time at v_line != nil {
-						v_stop_wait_time <- v_stop_wait_time + (max([0, (first(v_current_stops).stop_last_vehicle_depart_time at v_line + v_line.line_interval_time_m) - time]));
-						write "sssssss " + self + " :: " + v_line.line_name + " ** " +  v_stop_wait_time;
-					}*/
 				}
 				// first return stop : filling timetable of return 
 				else if first(v_current_stops) = first(v_line.line_return_stops.keys) and v_current_direction = DIRECTION_RETURN {
@@ -128,11 +141,28 @@ species MVehicle skills: [moving] {
 			//#####################//
 			
 			if v_in_city {
+				// save bunchings : bunching is fixed at interval_time / 10
+				if v_line.line_type != LINE_TYPE_TAXI and save_data_on {
+					MStop mcurrentstop <- first(v_current_stops);
+
+					if !(mcurrentstop in [first(v_line.line_outgoing_stops.keys),first(v_line.line_return_stops.keys)])
+							and mcurrentstop.stop_last_vehicle_depart_time at (v_line::v_current_direction) != nil	 {
+						
+						float last_time <- mcurrentstop.stop_last_vehicle_depart_time at (v_line::v_current_direction);
+						if time - last_time <= v_line.line_interval_time_m / 10 {
+							int zone <- mcurrentstop.stop_zone != nil ? mcurrentstop.stop_zone.zone_code : -1;
+							save '' + cycle + ',' + v_line.line_type + ',' + v_line.line_name + "," +
+										length(v_passengers) + ',' + mcurrentstop.stop_id + ',' + zone
+								format: "text" rewrite: false to: "../results/data_"+sim_id+"/bunchings.csv";
+						}	
+					}		
+				}
+				
 				/****************************** DROP ******************************/
 				// drop off all passengers who have arrived to their destination
 				int droppers <- 0; int transfers <- 0;
 				ask v_passengers where (each.ind_current_trip.trip_end_stop in v_current_stops) { 
-					list<int> my_ind_times; // for STATS only
+					//list<int> my_ind_times; // for STATS only
 					
 					if ind_trip_options at ind_current_trip != TRIP_FIRST {	// the passenger has arrived
 						ind_times[ind_current_trip_index] <+ int(time); // final arrival time
@@ -154,7 +184,7 @@ species MVehicle skills: [moving] {
 						put walked_dist at: ind_current_trip in: ind_used_trips;
 						
 						// take the last list
-						my_ind_times <- last(ind_times);
+						//my_ind_times <- last(ind_times);
 						
 						if save_data_on {
 							int z1; int z2;
@@ -181,13 +211,14 @@ species MVehicle skills: [moving] {
 						transfers <- transfers + 1;
 						ind_current_trip.trip_end_stop.stop_transited_people <+ self;
 						// take the first list
-						my_ind_times <- first(ind_times);
+						//my_ind_times <- first(ind_times);
 					}
 					myself.v_passengers >- self;					
 					myself.v_stop_wait_time <- myself.v_stop_wait_time + V_TIME_DROP_IND;
 					
 					/****************************************/	
 					/**************** STATS ****************/
+					/*
 					if ind_current_trip.trip_line.line_type = LINE_TYPE_BUS {
 						number_of_completed_bus_trips <- number_of_completed_bus_trips + 1;
 						wtimes_completed_bus_trips <+ my_ind_times[1] - my_ind_times[0];
@@ -216,7 +247,17 @@ species MVehicle skills: [moving] {
 				/****************************** TAKE ******************************/
 				// take the maximum number of passengers
 				int n_individs <- v_capacity - length(v_passengers);
-				if n_individs > 0 {
+				if n_individs = 0 { // the vehicle cannot take more individuals
+					// save skippings
+					if save_data_on and v_line.line_type != LINE_TYPE_TAXI {
+						MStop mcurrentstop <- first(v_current_stops);
+						int zone <- mcurrentstop.stop_zone != nil ? mcurrentstop.stop_zone.zone_code : -1;
+						save '' + cycle + ',' + v_line.line_type + ',' + v_line.line_name + "," +
+								mcurrentstop.stop_id + ',' + zone
+							format: "text" rewrite: false to: "../results/data_"+sim_id+"/skippings.csv";		
+					}
+				} else {
+					/// collect people from connected stops to a taxi point, or from neighbors of a bus stop
 					list<MStop> relevant_stops <- v_line.line_type = LINE_TYPE_TAXI ? v_current_stops :
 														first(v_current_stops).stop_neighbors;
 					list<Individual> waiting_individuals <- relevant_stops accumulate each.stop_waiting_people where (
@@ -233,30 +274,60 @@ species MVehicle skills: [moving] {
 						//############ filter individuals based on active strategies ############//
 						//#######################################################################//
 						
+						
 						//############################## transfer ##############################/			
+						
+						// individuals in their first trip that can still wait for a single trip
+						list<Individual> inds_to_remove1 <- waiting_individuals where (each.ind_current_trip_index = 0 and
+													int(time - each.ind_times[0][0]) < IND_WAITING_TIME_TRANSFER);
+						// individuals in their second trip that can still wait
+						list<Individual> inds_to_remove2 <- waiting_individuals where (each.ind_current_trip_index = 1 and
+													int(time - each.ind_times[1][0]) < IND_WAITING_TIME_TRANSFER);
+						
 						// if transfer is off, remove individuals with double-trip that can still wait for a single-trip
-						if !transfer_on and v_line.line_type != LINE_TYPE_TAXI {
-							// first, retrieve individuals with no single trips on this vehicle (the vehicle can only transfer them)
-							list<Individual> inds_to_remove <- waiting_individuals where (each.ind_current_trip_index = 0
-													and empty(each.ind_trip_options.pairs where (each.value = TRIP_SINGLE
+						if transfer_strategy = NO_TRANSFER {
+							// first, retrieve individuals with no single trips on this line (the vehicle can only transfer them)
+							inds_to_remove1 <- inds_to_remove1 where empty(each.ind_trip_options.pairs where (each.value = TRIP_SINGLE
 																and each.key.trip_line = v_line
 																and each.key.trip_line_direction = v_current_direction
-																and each.key.trip_start_stop in first(v_current_stops).stop_neighbors)));
-							// see if these individuals can do a single-trip on another bus
-							if !empty(inds_to_remove) {
-								// individuals with a single trip on other vehicles and who can still wait for a single trip
-								inds_to_remove <- (inds_to_remove where (int(time - each.ind_times[0][0]) < IND_WAITING_TIME_FOR_SINGLE_TRIPS
-												and !empty(each.ind_trip_options.pairs where (each.value = TRIP_SINGLE
+																and each.key.trip_start_stop in relevant_stops));
+							if !empty(inds_to_remove1) {
+								// see if these individuals can do a single-trip on another line
+								inds_to_remove1 <- inds_to_remove1 where !empty(each.ind_trip_options.pairs where (each.value = TRIP_SINGLE
 															and each.key.trip_line != v_line
-															and each.key.trip_start_stop in first(v_current_stops).stop_neighbors))));
+															and each.key.trip_start_stop in relevant_stops));
 								// remove
-								waiting_individuals <- waiting_individuals - inds_to_remove;
-								if !empty(inds_to_remove) {
-									write "##### " + inds_to_remove + " removed by TRANSFER form: " + self + " at: " + first(v_current_stops);
+								waiting_individuals <- waiting_individuals - inds_to_remove1;
+								if !empty(inds_to_remove1) {
+									write "##### " + inds_to_remove1 + " removed by NO_TRANSFER from: " + self + " at: " + first(v_current_stops);
 								}
 							}
 						}
-
+						 
+						// if transfer is only with BUS and this line is not BUS
+						else if transfer_strategy = TRANSFER_BUS_ONLY and v_line.line_type != LINE_TYPE_BUS {
+							// individuals that traveled with a BUS and can still wait for a BUS
+							inds_to_remove2 <- inds_to_remove2 where (each.ind_used_trips.keys[0].trip_line.line_type = LINE_TYPE_BUS and
+														!empty(each.ind_trip_options.pairs where (each.value = TRIP_SECOND
+															and each.key.trip_line.line_type = LINE_TYPE_BUS
+															and each.key.trip_start_stop in relevant_stops)));
+							if !empty(inds_to_remove2) {
+								write "***** " + inds_to_remove2 + " removed by TRANSFER_BUS_ONLY from: " + self + " at: " + first(v_current_stops);
+							}
+						}
+						
+						// if transfer with taxi is not active and this line is taxi
+						else if transfer_strategy != TRANSFER_BUS_BRT_TAXI and v_line.line_type = LINE_TYPE_TAXI {
+							// individuals that traveled with a BUS/BRT and can still wait for a BUS/BRT
+							inds_to_remove2 <- inds_to_remove2 where (each.ind_used_trips.keys[0].trip_line.line_type != LINE_TYPE_TAXI and
+														!empty(each.ind_trip_options.pairs where (each.value = TRIP_SECOND
+															and each.key.trip_line.line_type != LINE_TYPE_TAXI
+															and each.key.trip_start_stop in relevant_stops)));
+							if !empty(inds_to_remove2) {
+								write "$$$$$ " + inds_to_remove2 + " removed by !TRANSFER_BUS_BRT_TAXI from: " + self + " at: " + first(v_current_stops);
+							}
+						}
+						
 						//############################## timetables ##############################/
 						if time_tables_on and v_line.line_type != LINE_TYPE_TAXI {
 							list<Individual> inds_to_remove <- [];
@@ -370,7 +441,9 @@ species MVehicle skills: [moving] {
 						
 						int takens <- 0;
 						ask n_individs among waiting_individuals {
-							if ind_waiting_stop.stop_waiting_people contains self { //prevent multiple vahicles taking the same individual at the same time
+							if ind_waiting_stop.stop_waiting_people contains self and
+								( (ind_current_trip_index = 0 and empty(ind_used_trips)) or 
+									(ind_current_trip_index = 1 and length(ind_used_trips)=1) )	{ //prevent multiple vahicles taking the same individual at the same time
 								ind_waiting_stop.stop_waiting_people >- self;
 								takens <- takens + 1;
 								myself.v_passengers <+ self;
@@ -396,10 +469,9 @@ species MVehicle skills: [moving] {
 									}	
 								}
 								ind_used_trips <+ ind_current_trip::walked_dist;
+							} else {
+								write "ERRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR" color:#red;
 							}
-
-
-
 						}	
 						if takens > 0 {
 							write world.formatted_time() + v_line.line_name  + ' (' + v_current_direction + ') is taking '
@@ -452,18 +524,26 @@ species MVehicle skills: [moving] {
 					//}
 				}
 			}
+
 			// add the daparture time of vehicle from current_stops
-			/*if v_line.line_type != LINE_TYPE_TAXI {
+			if v_line.line_type != LINE_TYPE_TAXI {
 				ask v_current_stops {
-					put time in: stop_last_vehicle_depart_time at: myself.v_line;
+					put time in: stop_last_vehicle_depart_time at: (myself.v_line::myself.v_current_direction);
 				}
-			}*/
+			}
 			
+			// a vehicle is done working
+			//if !v_is_over {
+			//	v_is_over <- true;
+			//}
+			
+			// if is not a taxi with no stop time, return
 			if !(v_line.line_type = LINE_TYPE_TAXI and v_stop_wait_time = 0) {
 				return;	
 			}
-		} // en of location overlaps
 			
+		} // end of location overlaps
+
 		do goto target: v_next_loc speed: v_speed
 					on: v_current_direction = DIRECTION_OUTGOING ? v_line.line_outgoing_graph : v_line.line_return_graph;
 	}

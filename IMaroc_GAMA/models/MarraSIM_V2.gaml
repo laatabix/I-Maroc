@@ -38,9 +38,9 @@ global {
 	
 	/****************************************/	
 	/**************** STATS ****************/
-	list<list<float>> number_of_completed_trips <- [[],[],[]];
-	list<list<float>> mean_wait_time_completed_trips <- [[],[],[]];
-	list<list<float>> mean_trip_time_completed_trips <- [[],[],[]];
+	//list<list<float>> number_of_completed_trips <- [[],[],[]];
+	//list<list<float>> mean_wait_time_completed_trips <- [[],[],[]];
+	//list<list<float>> mean_trip_time_completed_trips <- [[],[],[]];
 	/****************************************/	
 	/***************************************/
 	
@@ -51,20 +51,25 @@ global {
 		write "--+-- START OF INIT --+--" color: #green;
 		
 		if !save_data_on { // warn when save data is off
-			/*bool data_off_ok <- user_confirm("Confirm","Data saving is off. Do you want to proceed ?");
+			bool data_off_ok <- user_confirm("Confirm","Data saving is off. Do you want to proceed ?");
 			if !data_off_ok {
 				do die;
-			}*/
+			}
 		} else {
 			sim_id <- machine_time;
-			save 'traffic_on = ' + traffic_on + '\n' + 'transfer_on = ' + transfer_on + '\n' + 'time_tables_on = ' + time_tables_on
+			// simulation parameters
+			save 'traffic_on = ' + traffic_on + '\n' + 'transfer_strategy = ' + transfer_labels[transfer_strategy] + '\n' +
+							'time_tables_on = ' + time_tables_on
 					format: "text" to: "../results/data_"+sim_id+"/params.txt";
-
+			// completed trips
 			save "cycle,individual,start_stop,end_stop,start_zone,end_zone,"+
 					"trip_type,line_type,line,direction,ride_distance,walk_distance,wait_time,board_time,arrival_time"
 					format: 'text' to: "../results/data_"+sim_id+"/completedtrips.csv";
-			
-			save "cycle,line,urban,nvouts,nvrets" format: 'text' to: "../results/data_"+sim_id+"/nvehicles.csv";
+			// number of running vehicles for each line
+			save "cycle,line_type,line,urban,nvouts,nvrets" format: 'text' to: "../results/data_"+sim_id+"/nvehicles.csv";
+			// skippings and bunchings
+			save "cycle,line_type,line,stop,zone" format: 'text' to: "../results/data_"+sim_id+"/skippings.csv";
+			save "cycle,line_type,line,npassengers,stop,zone" format: 'text' to: "../results/data_"+sim_id+"/bunchings.csv";
 		}
 		
 		// create the environment: city, districts, roads, traffic signals
@@ -96,7 +101,7 @@ global {
 			loop i from: 0 to: busMatrix.rows -1 {
 				string bus_line_name <- busMatrix[0,i];
 				
-				if !(bus_line_name in ["L40","L41","L332","L19"]) { 
+				if bus_line_name in["L30","L14"]{//!(bus_line_name in ["L40","L41","L332","L19"]) { 
 					// create the bus line if it does not exist yet
 					BusLine current_bl <- first(BusLine where (each.line_name = bus_line_name));
 					
@@ -153,25 +158,12 @@ global {
 					line_com_speed <- float(busDataMatrix[7, yindex]) #km/#h;
 					line_interval_time_m <- float(busDataMatrix[4, yindex]) #minute;
 				}
-				// compute the number of vehicles based on the path distance and the interval time
-				//int v_outs <- round( (line_outgoing_shape.perimeter / line_com_speed) / line_interval_time_m);
-				//int v_rets <- round( (line_return_shape.perimeter / line_com_speed) / line_interval_time_m);
-				
-				//do create_vehicles (int(n_vehicles/2), DIRECTION_OUTGOING);
-				//do create_vehicles (int(n_vehicles/2), DIRECTION_RETURN);
-				
-				//do create_vehicles (1, DIRECTION_OUTGOING);
-				//do create_vehicles (1, DIRECTION_RETURN);
-				
-				//ask n_large_vehicles among BusVehicle where (each.v_line = self) {
-				//	v_capacity <- BUS_LARGE_CAPACITY;
-				//}
 			}
 		}
 		/**************************************************************************************************************************/
 		/*** BRT LINES ***/
 		/**************************************************************************************************************************/
-		//*
+		/*
 		write "Creating BRT stops and lines ...";
 		create BRTStop from: marrakesh_brt_stops with: [stop_id::int(get("ID")), stop_name::get("NAME"),
 								stop_zone::PDUZone first_with(each.zone_code = int(get("pduzone_id")))]{
@@ -211,15 +203,9 @@ global {
 				}	
 			}
 			
-			// creating n_vehicles for each BRT line
-			//write "Creating BRT vehicles ...";
 			ask BRTLine {
 				line_outgoing_locations <- remove_duplicates(line_outgoing_stops.values);
 				line_return_locations <- remove_duplicates(line_return_stops.values);
-				
-				//int n_vehicles <- DEFAULT_NUMBER_BRT;
-				//do create_vehicles (int(n_vehicles/2), DIRECTION_OUTGOING);
-				//do create_vehicles (int(n_vehicles/2), DIRECTION_RETURN);
 			}	
 			ask dummy_geom { do die; }	
 		}
@@ -227,7 +213,7 @@ global {
 		/**************************************************************************************************************************/
 		/*** TAXI LINES ***/
 		/**************************************************************************************************************************/
-		//*
+		/*
 		if TAXI_ON {
 			write "Creating Taxi lines and stations ...";
 			create TaxiStop from: marrakesh_taxi_stations with: [stop_id::int(get("ID")), stop_name::get("NAME"),
@@ -302,13 +288,6 @@ global {
 					}
 				}
 			}
-			
-			//write "Creating Taxi vehicles ...";
-			//ask TaxiLine {
-				//int n_vehicles <- DEFAULT_NUMBER_TAXI;
-				//do create_vehicles (int(n_vehicles/2), DIRECTION_OUTGOING);
-				//do create_vehicles (int(n_vehicles/2), DIRECTION_RETURN);
-			//}
 			ask dummy_geom { do die; }
 		}
 		
@@ -421,6 +400,7 @@ global {
 		//do update_zones_colors;
 		
 		/*/------------ STATS ------------/*/
+		/*
 		number_of_completed_trips[0] <+ number_of_completed_bus_trips;
 		number_of_completed_trips[1] <+ number_of_completed_brt_trips;
 		number_of_completed_trips[2] <+ number_of_completed_taxi_trips;
@@ -432,6 +412,7 @@ global {
 		mean_trip_time_completed_trips[0] <+ mean(triptimes_completed_bus_trips)/60;
 		mean_trip_time_completed_trips[1] <+ mean(triptimes_completed_brt_trips)/60;
 		mean_trip_time_completed_trips[2] <+ mean(triptimes_completed_taxi_trips)/60;
+		//***/
 	}
 	
 	/*******************************************************************************************************************************/
@@ -465,12 +446,14 @@ experiment MarraSIM type: gui {
 		minimum_cycle_duration <- 0.5;
 	}
 	
-	text "SAVE DATA parameter is " + (save_data_on ? "ON" : "OFF") category:"Simulation" color: #darkred font: font("Tahoma",10,#bold);
+	text "SAVE DATA parameter is " + (save_data_on ? "ON" : "OFF") category:"Simulation"
+				color: #darkred font: font("Tahoma",10,#bold);
 	parameter "CONGESTION" category:"Traffic" var: traffic_on {ask world {do traffic_on_off;}}
 	
-	parameter "FREE TRANSFER" category: "Mobility" var: transfer_on {write "Free ticket transfer is " + (transfer_on? "ON" : "OFF");}
-	parameter "TIME TABLES" category: "Mobility" var: time_tables_on {write "Time tables availability is " + (time_tables_on? "ON" : "OFF");}
-	
+	parameter "FREE TRANSFER" category: "Mobility" var: transfer_strategy among:[0,1,2,3] max:3 min:0
+				{write "Free transfer strategy is " + transfer_labels[transfer_strategy];}
+	parameter "TIME TABLES" category: "Mobility" var: time_tables_on
+				{write "Time tables availability is " + (time_tables_on? "ON" : "OFF");}
 	
 	output {
 		 
@@ -481,7 +464,7 @@ experiment MarraSIM type: gui {
 	            draw "" + world.formatted_time() at: {20#px, 25#px} font: AFONT0 color: #yellow;
 	        }
 	        
-	        species PDUZone refresh: false;
+	        //species PDUZone refresh: false;
 			species BusLine refresh: false;
 			species TaxiLine refresh: false;
 			species BRTLine refresh: false;
@@ -514,8 +497,8 @@ experiment MarraSIM type: gui {
 				data "TAXI" color: #orange value: mean_trip_time_completed_trips[2] marker_shape: marker_empty;
 			}	
 		}//*/
-		
-		/*display "Waiting People" type: opengl background: #black toolbar:false{
+		/*
+		display "Waiting People" type: opengl background: #black toolbar:false{
 			camera 'default' location: {76018.3846,71284.6176,21920.7288} target: {76018.3846,71284.235,0.0};
 			species PDUZone aspect: wait_people;
 		}

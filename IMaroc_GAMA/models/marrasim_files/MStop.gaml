@@ -83,7 +83,9 @@ species MStop schedules: [] parallel: true {
 	list<pair<MLine,int>> stop_lines <- [];
 	// for each stop, the taxi lines (+direction) that an Individual can take + closest line on the taxiline to the stop
 	list<pair<TaxiLine,int>> stop_connected_taxi_lines <- [];
-	//map<MLine,float> stop_last_vehicle_depart_time <-[];
+	map<pair<MLine,int>,float> stop_last_vehicle_depart_time <-[];
+	bool stop_is_busy <- false; // if a vehicle is taking/dropping individuals at a stop, make it busy to prevent other vehicles from working
+	//list<MVehicle> stop_current_stopping_vehicles <- [];
 }
 
 species BusStop parent: MStop {

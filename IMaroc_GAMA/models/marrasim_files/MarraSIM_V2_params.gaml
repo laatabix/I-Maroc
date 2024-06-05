@@ -12,14 +12,20 @@ global {
 	/********* Simulation *********/
 	float sim_id; // a unique simulation id for data storage
 	// whether to save simulation data (to /outputs) or not
-	bool save_data_on <- false;
+	bool save_data_on <- true;
 	
 	bool BUS_ON <- true;
 	bool BRT_ON <- true;
 	bool TAXI_ON <- true;
 	
+	list<string> transfer_labels <- ["NO TRANSFER","BUS TRANSFER ONLY","BUS-BRT TRANSFER","BUS-BRT-TAXI TRANSFER"];
+	int NO_TRANSFER <- 0;
+	int TRANSFER_BUS_ONLY <- 1;
+	int TRANSFER_BUS_BRT <- 2;
+	int TRANSFER_BUS_BRT_TAXI <- 3;
+	
 	bool traffic_on <- false;
-	bool transfer_on <- true;
+	int transfer_strategy <- TRANSFER_BUS_BRT_TAXI;
 	bool time_tables_on <- false;
 	
 	int DIRECTION_OUTGOING <- 1;
