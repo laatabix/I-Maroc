@@ -315,7 +315,7 @@ global {
 		/**************************************************************************************************************************/
 		/*** POPULATION ***/
 		/**************************************************************************************************************************/
-		/*
+		//*
 		write "Creating population ...";
 		matrix popMatrix <- matrix(csv_file("../includes/population/populations.csv",true));
 		loop i from: 0 to: popMatrix.rows -1 {
@@ -359,7 +359,6 @@ global {
 		write "Total population: " + length(Individual);
 		//*/
 		write "--+-- END OF INIT --+--" color:#green;
-		create dummy_ind number: 100;		
 	}
 	
 	/********* end of init definition *********/
@@ -402,7 +401,7 @@ global {
 		//do update_zones_colors;
 		
 		/*/------------ STATS ------------/*/
-		/*
+		//*
 		number_of_completed_trips[0] <+ number_of_completed_bus_trips;
 		number_of_completed_trips[1] <+ number_of_completed_brt_trips;
 		number_of_completed_trips[2] <+ number_of_completed_taxi_trips;
@@ -442,20 +441,6 @@ species dummy_geom {
 	int g_var2;
 }
 
-species dummy_ind {
-	rgb color <- #red;
-	int size <- one_of([50,100,50,150,200]);
-	
-	init {
-		BusStop bs <- one_of (BusLine where (each.line_is_urban) accumulate each.line_outgoing_stops.keys);
-		location <- any_location_in (100#meter around bs);
-	}
-	
-	aspect default {
-		draw circle (size#meter) color: color;
-	}
-}
-
 experiment MarraSIM type: gui {
 	
 	init {
@@ -490,8 +475,6 @@ experiment MarraSIM type: gui {
 			species BusVehicle;
 			species TaxiVehicle;
 			species BRTVehicle;
-			
-			species dummy_ind;
 		}
 		
 		/*
