@@ -61,6 +61,7 @@ global {
 		float interval_wpeople <- max(waiting_people)/length(level_colors);
 		float interval_wtimes <- max(waiting_times)/length(level_colors);
 		float interval_ttimes <- max(trip_times)/length(level_colors);
+
 		ask PDUZone {
 			wp_color <- interval_wpeople = 0 ? #lightgray : level_colors[min([4,int(waiting_people at self / interval_wpeople)])];
 			wt_color <- interval_wtimes = 0 ? #lightgray : level_colors[min([4,int(waiting_times at self / interval_wtimes)])];

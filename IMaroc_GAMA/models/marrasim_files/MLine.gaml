@@ -33,7 +33,7 @@ species MLine schedules: [] parallel: true {
 	string line_name;
 	int line_type;
 	bool line_is_urban <- true;
-	float line_com_speed <- BUS_URBAN_SPEED;
+	float line_com_speed <- BUS_URBAN_TRAFFIC_SPEED;
 	float line_interval_time_m <- DEFAULT_INTERVAL_TIME_BUS_URBAN;
 	map<MStop,point> line_outgoing_stops <- []; // list of bus stops on an outgoing path
 	map<MStop,point> line_return_stops <- []; // bus stops on the return path
@@ -78,11 +78,9 @@ species MLine schedules: [] parallel: true {
 			loop i from: 0 to: num-1 {
 				create BusVehicle {
 					do init_vehicle(myself, direction);
-					v_stop_wait_time <- (myself.line_interval_time_m * i);
-					if traffic_on {
-						v_speed <- myself.line_com_speed;
-					}
-					if myself.line_is_urban {
+					v_stop_wait_time <- v_line.line_interval_time_m * i;
+					v_speed <- traffic_on ? v_line.line_com_speed : BUS_URBAN_FREE_SPEED;
+					if v_line.line_is_urban {
 						urban_busses <+ self;
 					} else {
 						sub_urban_busses <+ self;	
@@ -100,7 +98,8 @@ species MLine schedules: [] parallel: true {
 			loop i from: 0 to: num-1 {
 				create TaxiVehicle {
 					do init_vehicle(myself, direction);
-					v_stop_wait_time <- (myself.line_interval_time_m * i);
+					v_stop_wait_time <- v_line.line_interval_time_m * i;
+					v_speed <- traffic_on ? TAXI_TRAFFIC_SPEED : TAXI_FREE_SPEED;
 				}
 			}
 		}

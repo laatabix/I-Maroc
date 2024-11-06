@@ -31,7 +31,7 @@ global {
 			v_in_city <- false;
 		}
 		ask sub_urban_busses where (first(each.v_current_stops).stop_zone != nil) {
-			v_speed <- traffic_on ? v_line.line_com_speed : BUS_URBAN_SPEED;
+			v_speed <- traffic_on ? BUS_URBAN_TRAFFIC_SPEED : BUS_URBAN_FREE_SPEED;
 			v_in_city <- true;
 		}
 	}
@@ -119,7 +119,6 @@ species MVehicle skills: [moving] {
 			
 			//#####################//
 			if v_line.line_type != LINE_TYPE_TAXI {
-				// compute timetables with theoretical speed or commercial speed ? consider real dynamic traffic ?? TODO
 				// first outgoing stop : filling timetable of outgoing
 				// second condition to prevent null when last outgoing stop = first return stop
 				if first(v_current_stops) = first(v_line.line_outgoing_stops.keys) and v_current_direction = DIRECTION_OUTGOING {
@@ -162,7 +161,7 @@ species MVehicle skills: [moving] {
 				// drop off all passengers who have arrived to their destination
 				int droppers <- 0; int transfers <- 0;
 				ask v_passengers where (each.ind_current_trip.trip_end_stop in v_current_stops) { 
-					//list<int> my_ind_times; // for STATS only
+					list<int> my_ind_times; // for STATS only
 					
 					if ind_trip_options at ind_current_trip != TRIP_FIRST {	// the passenger has arrived
 						ind_times[ind_current_trip_index] <+ int(time); // final arrival time
@@ -184,7 +183,7 @@ species MVehicle skills: [moving] {
 						put walked_dist at: ind_current_trip in: ind_used_trips;
 						
 						// take the last list
-						//my_ind_times <- last(ind_times);
+						my_ind_times <- last(ind_times);
 						
 						if save_data_on {
 							int z1; int z2;
@@ -211,14 +210,14 @@ species MVehicle skills: [moving] {
 						transfers <- transfers + 1;
 						ind_current_trip.trip_end_stop.stop_transited_people <+ self;
 						// take the first list
-						//my_ind_times <- first(ind_times);
+						my_ind_times <- first(ind_times);
 					}
 					myself.v_passengers >- self;					
 					myself.v_stop_wait_time <- myself.v_stop_wait_time + V_TIME_DROP_IND;
 					
 					/****************************************/	
 					/**************** STATS ****************/
-					/*
+					//*
 					if ind_current_trip.trip_line.line_type = LINE_TYPE_BUS {
 						number_of_completed_bus_trips <- number_of_completed_bus_trips + 1;
 						wtimes_completed_bus_trips <+ my_ind_times[1] - my_ind_times[0];
@@ -277,6 +276,7 @@ species MVehicle skills: [moving] {
 						
 						//############################## transfer ##############################/			
 						
+						
 						// individuals in their first trip that can still wait for a single trip
 						list<Individual> inds_to_remove1 <- waiting_individuals where (each.ind_current_trip_index = 0 and
 													int(time - each.ind_times[0][0]) < IND_WAITING_TIME_TRANSFER);
@@ -303,7 +303,6 @@ species MVehicle skills: [moving] {
 								}
 							}
 						}
-						 
 						// if transfer is only with BUS and this line is not BUS
 						else if transfer_strategy = TRANSFER_BUS_ONLY and v_line.line_type != LINE_TYPE_BUS {
 							// individuals that traveled with a BUS and can still wait for a BUS
@@ -329,6 +328,7 @@ species MVehicle skills: [moving] {
 						}
 						
 						//############################## timetables ##############################/
+						
 						if time_tables_on and v_line.line_type != LINE_TYPE_TAXI {
 							list<Individual> inds_to_remove <- [];
 							
@@ -348,6 +348,7 @@ species MVehicle skills: [moving] {
 									pair<MTrip,int> ppr <- mtrips.pairs where (each.key.trip_end_stop in v_time_table.keys)
 																		with_min_of (v_time_table at each.key.trip_end_stop);
 									besttrip <- ppr != nil ? ppr.key : nil;
+									write "besttripbesttrip " + self + " :: " + besttrip;
 								}// else {
 									// if no SINGLE or SECOND trips are found, then maybe a FIRST
 									/*if indiv.ind_current_trip_index = 0 {
@@ -367,6 +368,7 @@ species MVehicle skills: [moving] {
 								if besttrip != nil {
 									besttrip_type <- mtrips at besttrip;
 									int time_to_dest_this <- v_time_table at besttrip.trip_end_stop;
+									write "time_to_dest_this " + time_to_dest_this;
 									// theoretical arrival time not reached yet
 									if time_to_dest_this > v_time_table at first(v_current_stops) {
 										// trips using other lines
@@ -375,6 +377,7 @@ species MVehicle skills: [moving] {
 										if besttrip_type != TRIP_FIRST {
 											// if the best trip on this bus takes to destination, compare only with trips that take to destination
 											othertrips <- map(indiv.ind_trip_options.pairs where (each.key.trip_line != v_line
+														and each.key.trip_line.line_type != LINE_TYPE_TAXI
 														and each.key.trip_start_stop in first(v_current_stops).stop_neighbors
 													and (    (indiv.ind_current_trip_index = 0 and each.value = TRIP_SINGLE)
 										 		  		  or (indiv.ind_current_trip_index = 1 and each.value = TRIP_SECOND))));
@@ -383,16 +386,26 @@ species MVehicle skills: [moving] {
 										//	othertrips <- map(indiv.ind_trip_options.pairs where (each.key.trip_line != v_line and
 											//	/*each.value = TRIP_FIRST and*/ each.key.trip_start_stop in first(v_current_stops).stop_neighbors));
 										}
+										write "othertrips " + othertrips;
 										loop mtrp over: othertrips.keys {
+											
 											int min_time_to_dest_others <- #max_int;
 											// vehicles that can serve this trip
-											list<MVehicle> vehs <- BusVehicle where (each.v_line = mtrp.trip_line
-																and each.v_current_direction = mtrp.trip_line_direction and 
-																!empty(each.v_time_table) and mtrp.trip_end_stop in each.v_time_table.keys)
-															+
-																BRTVehicle where (each.v_line = mtrp.trip_line
-																and each.v_current_direction = mtrp.trip_line_direction and 
-																!empty(each.v_time_table) and mtrp.trip_end_stop in each.v_time_table.keys);
+											list<MVehicle> vehs <- [];
+											
+											if mtrp.trip_line.line_type = LINE_TYPE_BUS {
+												vehs <- BusVehicle where (each.v_line = mtrp.trip_line
+																	and each.v_current_direction = mtrp.trip_line_direction and 
+																	!empty(each.v_time_table) and mtrp.trip_end_stop in each.v_time_table.keys);
+												write "BUSBUS";
+											} else if mtrp.trip_line.line_type = LINE_TYPE_BRT {
+												vehs <- BRTVehicle where (each.v_line = mtrp.trip_line
+																	and each.v_current_direction = mtrp.trip_line_direction and 
+																	!empty(each.v_time_table) and mtrp.trip_end_stop in each.v_time_table.keys);
+												write "BRTBRT";
+											}
+											
+											write "11111 vehsvehsvehs " + vehs;
 											
 											if !empty(vehs) {
 												// only vehicles which did not reach the current stop yet
@@ -404,9 +417,13 @@ species MVehicle skills: [moving] {
 																each.v_line.line_return_stops index_of mtrp.trip_start_stop);
 												}
 												
+												write "22222 vehsvehsvehs " + vehs;
+												
 												if !empty(vehs) {
 													MVehicle veh <- vehs with_min_of (each.v_time_table at mtrp.trip_end_stop);
 													int ttm <- veh.v_time_table at mtrp.trip_end_stop;
+													
+													write "mtrp " + mtrp + " vvv " + veh + " ttmttmttmttm " + ttm;
 													
 													if (ttm > veh.v_time_table at first(v_current_stops)) and ttm < min_time_to_dest_others {
 														/*if othertrips at mtrp = TRIP_FIRST {
@@ -425,6 +442,7 @@ species MVehicle skills: [moving] {
 													}
 												}
 											}
+											
 											if min_time_to_dest_others < time_to_dest_this {
 												write "##### " + indiv + " removed by TIMETABLES form: " + self + " at: " + first(v_current_stops);
 												inds_to_remove <+ indiv;
@@ -550,7 +568,6 @@ species MVehicle skills: [moving] {
 }
 
 species BusVehicle parent: MVehicle {
-	float v_speed <- BUS_URBAN_SPEED;
 	image_file v_icon <- image_file("../../includes/img/bus.png");
 	geometry shape <- envelope(v_icon);
 	
@@ -571,7 +588,6 @@ species BRTVehicle parent: MVehicle {
 }	
 
 species TaxiVehicle parent: MVehicle {
-	float v_speed <- traffic_on ? TAXI_TRAFFIC_SPEED : TAXI_FREE_SPEED;
 	int v_capacity <- TAXI_CAPACITY;
 	
 	image_file v_icon <- image_file("../../includes/img/taxi.png");

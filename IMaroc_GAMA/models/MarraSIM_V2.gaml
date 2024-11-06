@@ -38,9 +38,9 @@ global {
 	
 	/****************************************/	
 	/**************** STATS ****************/
-	//list<list<float>> number_of_completed_trips <- [[],[],[]];
-	//list<list<float>> mean_wait_time_completed_trips <- [[],[],[]];
-	//list<list<float>> mean_trip_time_completed_trips <- [[],[],[]];
+	list<list<float>> number_of_completed_trips <- [[],[],[]];
+	list<list<float>> mean_wait_time_completed_trips <- [[],[],[]];
+	list<list<float>> mean_trip_time_completed_trips <- [[],[],[]];
 	/****************************************/	
 	/***************************************/
 	
@@ -48,6 +48,7 @@ global {
 	/******** Initialization ******/
 	/*****************************/
 	init {
+		
 		write "--+-- START OF INIT --+--" color: #green;
 		
 		if !save_data_on { // warn when save data is off
@@ -101,7 +102,7 @@ global {
 			loop i from: 0 to: busMatrix.rows -1 {
 				string bus_line_name <- busMatrix[0,i];
 				
-				if bus_line_name in["L30","L14"]{//!(bus_line_name in ["L40","L41","L332","L19"]) { 
+				if !(bus_line_name in ["L40","L41","L332","L19"]) { 
 					// create the bus line if it does not exist yet
 					BusLine current_bl <- first(BusLine where (each.line_name = bus_line_name));
 					
@@ -163,7 +164,7 @@ global {
 		/**************************************************************************************************************************/
 		/*** BRT LINES ***/
 		/**************************************************************************************************************************/
-		/*
+		//*
 		write "Creating BRT stops and lines ...";
 		create BRTStop from: marrakesh_brt_stops with: [stop_id::int(get("ID")), stop_name::get("NAME"),
 								stop_zone::PDUZone first_with(each.zone_code = int(get("pduzone_id")))]{
@@ -213,7 +214,7 @@ global {
 		/**************************************************************************************************************************/
 		/*** TAXI LINES ***/
 		/**************************************************************************************************************************/
-		/*
+		//*
 		if TAXI_ON {
 			write "Creating Taxi lines and stations ...";
 			create TaxiStop from: marrakesh_taxi_stations with: [stop_id::int(get("ID")), stop_name::get("NAME"),
@@ -357,7 +358,8 @@ global {
 
 		write "Total population: " + length(Individual);
 		//*/
-		write "--+-- END OF INIT --+--" color:#green;		
+		write "--+-- END OF INIT --+--" color:#green;
+		create dummy_ind number: 100;		
 	}
 	
 	/********* end of init definition *********/
@@ -422,7 +424,7 @@ global {
 	action traffic_on_off {
 		write "Traffic congestion is " + (traffic_on ? "ON" : "OFF");
 		ask urban_busses {
-			v_speed <- traffic_on ? v_line.line_com_speed : BUS_URBAN_SPEED;
+			v_speed <- traffic_on ? v_line.line_com_speed : BUS_URBAN_FREE_SPEED;
 		}
 		ask TaxiVehicle {
 			v_speed <- traffic_on ? TAXI_TRAFFIC_SPEED : TAXI_FREE_SPEED;
@@ -438,6 +440,20 @@ species dummy_geom {
 	string g_name;
 	int g_var1;
 	int g_var2;
+}
+
+species dummy_ind {
+	rgb color <- #red;
+	int size <- one_of([50,100,50,150,200]);
+	
+	init {
+		BusStop bs <- one_of (BusLine where (each.line_is_urban) accumulate each.line_outgoing_stops.keys);
+		location <- any_location_in (100#meter around bs);
+	}
+	
+	aspect default {
+		draw circle (size#meter) color: color;
+	}
 }
 
 experiment MarraSIM type: gui {
@@ -464,7 +480,7 @@ experiment MarraSIM type: gui {
 	            draw "" + world.formatted_time() at: {20#px, 25#px} font: AFONT0 color: #yellow;
 	        }
 	        
-	        //species PDUZone refresh: false;
+	        species PDUZone refresh: false;
 			species BusLine refresh: false;
 			species TaxiLine refresh: false;
 			species BRTLine refresh: false;
@@ -474,6 +490,8 @@ experiment MarraSIM type: gui {
 			species BusVehicle;
 			species TaxiVehicle;
 			species BRTVehicle;
+			
+			species dummy_ind;
 		}
 		
 		/*
@@ -497,8 +515,8 @@ experiment MarraSIM type: gui {
 				data "TAXI" color: #orange value: mean_trip_time_completed_trips[2] marker_shape: marker_empty;
 			}	
 		}//*/
-		/*
-		display "Waiting People" type: opengl background: #black toolbar:false{
+		
+		/*display "Waiting People" type: opengl background: #black toolbar:false{
 			camera 'default' location: {76018.3846,71284.6176,21920.7288} target: {76018.3846,71284.235,0.0};
 			species PDUZone aspect: wait_people;
 		}
@@ -511,6 +529,6 @@ experiment MarraSIM type: gui {
 		display "Trip Times (Destination)" type: opengl background: #black toolbar:false{
 			camera 'default' location: {76018.3846,71284.6176,21920.7288} target: {76018.3846,71284.235,0.0};
 			species PDUZone aspect: trip_time;
-		}*/
+		}//*/
 	}
 }
